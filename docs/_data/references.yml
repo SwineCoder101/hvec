@@ -220,6 +220,15 @@
   url: https://arxiv.org/abs/2310.05736
   note: Compresses the text the model reads, not the vectors it retrieves by. The payload-compression layer, which hvec deliberately leaves out of scope.
 
+- key: headroom2026
+  topic: Embeddings and RAG
+  authors: Headroom Labs
+  title: "Headroom: the context compression layer for AI agents"
+  venue: Open-source software, Apache-2.0
+  year: 2026
+  url: https://github.com/headroomlabs-ai/headroom
+  note: Production payload compression as a proxy, library and MCP server. Compresses what the model reads; hvec compresses what the store searches by and measures both.
+
 # --- Evaluation ---
 - key: es2023ragas
   topic: Evaluation

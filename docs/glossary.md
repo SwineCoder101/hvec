@@ -70,8 +70,9 @@ the tool. Papers are linked by key into the [references]({{ "/references/" | rel
   back (the chunk text). hvec compresses the key only. The agent never reads a vector, compressed
   or not; it reads the payload text that the retrieval step returns, uncompressed, into its context
   window. Compressing the payload itself (summarising or pruning passages before the model reads
-  them, as in [jiang2023llmlingua]({{ "/references/#jiang2023llmlingua" | relative_url }})) is a separate layer that changes what the agent
-  sees rather than what it finds. It is out of scope for hvec today.
+  them, as in [jiang2023llmlingua]({{ "/references/#jiang2023llmlingua" | relative_url }}) or the production tool [headroom2026]({{ "/references/#headroom2026" | relative_url }})) is a
+  separate layer that changes what the agent sees rather than what it finds. hvec does not
+  implement payload compression; measuring it as a pipeline stage is on the roadmap.
 
 **Homomorphic compression**
 : A compression scheme is homomorphic with respect to an operation when you can apply the

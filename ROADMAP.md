@@ -48,6 +48,15 @@ disagree.
 - **Experiment 2**: native low-precision embeddings versus post-hoc quantization of an f32 model
   at the same byte budget. If native wins, the right codec is a different embedding model.
 
+## Phase 5b · The payload axis
+
+- A `payload` stage between retrieval and the prompt: `none`, a naive truncation baseline, and
+  an adapter for an external compressor such as [Headroom](https://github.com/headroomlabs-ai/headroom)
+  running as a local proxy. Recorded per run like the codec.
+- **Experiment 3**: key compression alone, payload compression alone, and both together, on the
+  same questions and chat models. The claim under test: the two layers' effects on answers are
+  independent and additive, or they are not.
+
 ## Phase 6 · Agent memory and the encryption track
 
 - A memory-loop benchmark: an agent that writes tool results and turns back into the store and

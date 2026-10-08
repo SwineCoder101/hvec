@@ -46,6 +46,25 @@ compressed domain, ask a chat model, and record every stage's cost and outcome. 
 exists to answer is not "what is recall@10" but "does this compression change the answers a given
 model gives, and by how much".
 
+## Where hvec sits
+
+Two kinds of compression touch a retrieval-augmented agent, and they are easy to confuse.
+
+| | Key compression | Payload compression |
+|---|---|---|
+| What is compressed | The embedding vectors the store searches by | The text the model reads: tool output, logs, RAG chunks, history |
+| Where it acts | Inside the vector store, before retrieval | Between retrieval and the model, in the prompt |
+| What it changes | Which passages come back | How many tokens the model sees |
+| Example | int8, binary, product quantization | [Headroom](https://github.com/headroomlabs-ai/headroom), LLMLingua, summarisation |
+| hvec's role | **Implements and measures it** | **Measures it as a stage in the pipeline** (roadmap) |
+
+Headroom and tools like it are production layers that save tokens. hvec is a measurement
+harness. It does not sit in your request path and it does not make anything cheaper by itself.
+It answers a question those tools cannot answer about themselves: for a given embedding model,
+codec, payload compressor and chat model, did the answers change, and by how much. The two are
+complementary. A Headroom-style stage is a planned axis of the hvec benchmark matrix, so the
+combined effect of compressing the key and the payload can be measured in one run log.
+
 ## Goals
 
 - **Implement** a family of compressed-domain similarity codecs behind a shared trait.
@@ -77,9 +96,10 @@ hvec/
 └── README.md
 ```
 
-The benchmark is a matrix: **embedding model × codec × chat model × dataset**. Compression
-behaviour depends on the embedding model (dimension, distribution, normalisation). Tolerance to
-degraded retrieval depends on the chat model. hvec keeps both axes explicit in every run record.
+The benchmark is a matrix: **embedding model × codec × chat model × dataset**, with payload
+compression as a planned fifth axis. Compression behaviour depends on the embedding model
+(dimension, distribution, normalisation). Tolerance to degraded retrieval depends on the chat
+model. hvec keeps every axis explicit in every run record.
 
 ## Getting started
 
