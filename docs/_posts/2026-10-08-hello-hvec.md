@@ -15,7 +15,7 @@ rather than on reconstruction [2]. hvec moves it one level up, to the answer.
 
 <figure>
   <img src="{{ '/assets/homomorphic-compression.svg' | relative_url }}" width="960" alt="Animated diagram of homomorphic compression in a RAG and agent-memory loop">
-  <figcaption>The loop hvec measures. Memory and documents become f32 embeddings, a codec shrinks them, the query is scored directly on the compressed codes with no decode step, and the top passages enter the agent's context. The agent's new memory goes back through the same path. Fourteen-second loop; honours reduced-motion settings.</figcaption>
+  <figcaption>The loop hvec measures. Memory and documents become f32 embeddings, a codec shrinks them, the query is scored directly on the compressed codes with no decode step, and the top passages enter the agent's context. The agent's new memory goes back through the same path. Twenty-six-second loop: the sequence plays in about thirteen seconds, then holds on the finished picture for eleven before restarting; honours reduced-motion settings.</figcaption>
 </figure>
 
 hvec exists to measure the direct thing: run the same questions through the same pipeline with

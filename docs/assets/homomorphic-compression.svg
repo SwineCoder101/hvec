@@ -23,48 +23,48 @@
   .scan { stroke: #fbbf24; stroke-width: 1.2; stroke-dasharray: 4 3; fill: none; }
   .flow { stroke: #34d399; stroke-width: 1.5; fill: none; marker-end: url(#mg); }
   .loop { stroke: #a78bfa; stroke-width: 1.5; fill: none; stroke-dasharray: 5 4; marker-end: url(#mp); }
-@keyframes s_cards{0%,2.14%{opacity:0}5.71%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_embed{0%,10.0%{opacity:0}13.57%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_vecs{0%,13.57%{opacity:0}17.14%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_codec{0%,24.29%{opacity:0}27.86%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_codes{0%,27.86%{opacity:0}31.43%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_dim{0%,27.86%{opacity:0}31.43%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_query{0%,38.57%{opacity:0}42.14%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_scan{0%,42.86%{opacity:0}46.43%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_scores{0%,49.29%{opacity:0}52.86%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_nope{0%,55.71%{opacity:0}59.29%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_hits{0%,60.0%{opacity:0}63.57%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_flow{0%,66.43%{opacity:0}70.0%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_ctx{0%,70.0%{opacity:0}73.57%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_agent{0%,77.14%{opacity:0}80.71%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_ans{0%,82.14%{opacity:0}85.71%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes s_loop{0%,88.57%{opacity:0}92.14%,93%{opacity:1}98%,100%{opacity:0}}
-@keyframes d_scan{0%,42.86%{stroke-dashoffset:260;opacity:0}42.87%{opacity:1}48.57%,93%{stroke-dashoffset:0;opacity:1}98%,100%{opacity:0}}
-@keyframes d_flow{0%,66.43%{stroke-dashoffset:200;opacity:0}66.44000000000001%{opacity:1}72.14%,93%{stroke-dashoffset:0;opacity:1}98%,100%{opacity:0}}
-@keyframes d_loop{0%,88.57%{stroke-dashoffset:1200;opacity:0}88.58%{opacity:1}94.29%,93%{stroke-dashoffset:0;opacity:1}98%,100%{opacity:0}}
-@keyframes s_vecs_dim{0%,13.57%{opacity:0}17.14%,27.86%{opacity:1}32.14%,93%{opacity:.35}98%,100%{opacity:0}}
-@keyframes s_hits_pulse{0%,60.0%{opacity:0}62.86%,93%{opacity:1}98%,100%{opacity:0}}
-  .a-cards { opacity:0; animation: s_cards 14s linear infinite; }
-  .a-embed { opacity:0; animation: s_embed 14s linear infinite; }
-  .a-vecs { opacity:0; animation: s_vecs 14s linear infinite; }
-  .a-codec { opacity:0; animation: s_codec 14s linear infinite; }
-  .a-codes { opacity:0; animation: s_codes 14s linear infinite; }
-  .a-dim { opacity:0; animation: s_dim 14s linear infinite; }
-  .a-query { opacity:0; animation: s_query 14s linear infinite; }
-  .a-scan { opacity:0; animation: s_scan 14s linear infinite; }
-  .a-scores { opacity:0; animation: s_scores 14s linear infinite; }
-  .a-nope { opacity:0; animation: s_nope 14s linear infinite; }
-  .a-hits { opacity:0; animation: s_hits 14s linear infinite; }
-  .a-flow { opacity:0; animation: s_flow 14s linear infinite; }
-  .a-ctx { opacity:0; animation: s_ctx 14s linear infinite; }
-  .a-agent { opacity:0; animation: s_agent 14s linear infinite; }
-  .a-ans { opacity:0; animation: s_ans 14s linear infinite; }
-  .a-loop { opacity:0; animation: s_loop 14s linear infinite; }
+@keyframes s_cards{0%,1.15%{opacity:0}3.08%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_embed{0%,5.38%{opacity:0}7.31%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_vecs{0%,7.31%{opacity:0}9.23%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_codec{0%,13.08%{opacity:0}15.00%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_codes{0%,15.00%{opacity:0}16.92%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_dim{0%,15.00%{opacity:0}16.92%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_query{0%,20.76%{opacity:0}22.69%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_scan{0%,23.08%{opacity:0}25.00%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_scores{0%,26.54%{opacity:0}28.47%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_nope{0%,30.00%{opacity:0}31.93%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_hits{0%,32.31%{opacity:0}34.23%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_flow{0%,35.77%{opacity:0}37.69%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_ctx{0%,37.69%{opacity:0}39.61%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_agent{0%,41.54%{opacity:0}43.45%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_ans{0%,44.23%{opacity:0}46.15%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_loop{0%,47.69%{opacity:0}49.62%,94%{opacity:1}97.5%,100%{opacity:0}}
+@keyframes d_scan{0%,23.08%{stroke-dashoffset:260;opacity:0}23.09%{opacity:1}26.15%,94%{stroke-dashoffset:0;opacity:1}97.5%,100%{opacity:0}}
+@keyframes d_flow{0%,35.77%{stroke-dashoffset:200;opacity:0}35.77%{opacity:1}38.85%,94%{stroke-dashoffset:0;opacity:1}97.5%,100%{opacity:0}}
+@keyframes d_loop{0%,47.69%{stroke-dashoffset:1200;opacity:0}47.70%{opacity:1}50.77%,94%{stroke-dashoffset:0;opacity:1}97.5%,100%{opacity:0}}
+@keyframes s_vecs_dim{0%,7.31%{opacity:0}9.23%,15.00%{opacity:1}17.31%,94%{opacity:.35}97.5%,100%{opacity:0}}
+@keyframes s_hits_pulse{0%,32.31%{opacity:0}33.85%,94%{opacity:1}97.5%,100%{opacity:0}}
+  .a-cards { opacity:0; animation: s_cards 26s linear infinite; }
+  .a-embed { opacity:0; animation: s_embed 26s linear infinite; }
+  .a-vecs { opacity:0; animation: s_vecs 26s linear infinite; }
+  .a-codec { opacity:0; animation: s_codec 26s linear infinite; }
+  .a-codes { opacity:0; animation: s_codes 26s linear infinite; }
+  .a-dim { opacity:0; animation: s_dim 26s linear infinite; }
+  .a-query { opacity:0; animation: s_query 26s linear infinite; }
+  .a-scan { opacity:0; animation: s_scan 26s linear infinite; }
+  .a-scores { opacity:0; animation: s_scores 26s linear infinite; }
+  .a-nope { opacity:0; animation: s_nope 26s linear infinite; }
+  .a-hits { opacity:0; animation: s_hits 26s linear infinite; }
+  .a-flow { opacity:0; animation: s_flow 26s linear infinite; }
+  .a-ctx { opacity:0; animation: s_ctx 26s linear infinite; }
+  .a-agent { opacity:0; animation: s_agent 26s linear infinite; }
+  .a-ans { opacity:0; animation: s_ans 26s linear infinite; }
+  .a-loop { opacity:0; animation: s_loop 26s linear infinite; }
   .a-vecs { animation-name: s_vecs_dim; }
-  .a-scanline { opacity:0; stroke-dasharray: 260; animation: d_scan 14s linear infinite; }
-  .a-flowline { opacity:0; stroke-dasharray: 200; animation: d_flow 14s linear infinite; }
-  .a-loopline { opacity:0; stroke-dasharray: 1200; animation: d_loop 14s linear infinite; }
-  .a-hitring { opacity:0; animation: s_hits_pulse 14s linear infinite; }
+  .a-scanline { opacity:0; stroke-dasharray: 260; animation: d_scan 26s linear infinite; }
+  .a-flowline { opacity:0; stroke-dasharray: 200; animation: d_flow 26s linear infinite; }
+  .a-loopline { opacity:0; stroke-dasharray: 1200; animation: d_loop 26s linear infinite; }
+  .a-hitring { opacity:0; animation: s_hits_pulse 26s linear infinite; }
 
   @media (prefers-reduced-motion: reduce) {
     [class^="a-"], [class*=" a-"] { animation: none !important; opacity: 1 !important; stroke-dashoffset: 0 !important; }
