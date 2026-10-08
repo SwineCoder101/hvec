@@ -1,0 +1,68 @@
+# hvec configuration. Edit freely; run `hvec config show` to see the resolved values.
+
+# Where collections, chat sessions and the run log live. Defaults to the
+# platform data directory when omitted.
+# db_path = "~/.local/share/hvec/hvec.db"
+
+# Profiles used when --chat / --embedder are not passed.
+default_chat = "anthropic"
+default_embedder = "local"
+
+# Retrieval metric: "cosine", "dot" or "l2".
+metric = "cosine"
+
+# ---------------------------------------------------------------------------
+# Chat models
+# ---------------------------------------------------------------------------
+
+[chat.anthropic]
+provider = "anthropic"
+model = "claude-opus-5-5"
+api_key_env = "ANTHROPIC_API_KEY"
+max_tokens = 4096
+# Thinking depth on Opus 5.5 defaults to "medium" server-side. Options: low, medium, high, xhigh, max.
+effort = "medium"
+# Route declined requests to a fallback model automatically (Claude API only).
+fallbacks = true
+
+[chat.anthropic-sonnet]
+provider = "anthropic"
+model = "claude-sonnet-5-5"
+api_key_env = "ANTHROPIC_API_KEY"
+max_tokens = 4096
+
+[chat.openai]
+provider = "openai"
+model = "gpt-4.1-mini"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+max_tokens = 4096
+
+[chat.ollama]
+provider = "openai"
+model = "llama3.1"
+base_url = "http://localhost:11434/v1"
+max_tokens = 4096
+
+# ---------------------------------------------------------------------------
+# Embedding models
+# ---------------------------------------------------------------------------
+
+# Local ONNX model via fastembed. Downloaded on first use, then cached.
+# Run `hvec embedders` to list every supported local model.
+[embed.local]
+provider = "local"
+model = "Xenova/bge-small-en-v1.5"
+
+[embed.openai]
+provider = "openai"
+model = "text-embedding-3-small"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+dimension = 1536
+
+[embed.ollama]
+provider = "openai"
+model = "nomic-embed-text"
+base_url = "http://localhost:11434/v1"
+dimension = 768

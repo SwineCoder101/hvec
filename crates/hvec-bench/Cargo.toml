@@ -1,0 +1,18 @@
+[package]
+name = "hvec-bench"
+description = "Metrics, chunking and run records for hvec benchmarks"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+hvec-core.workspace = true
+hvec-store.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+
+[lints]
+workspace = true

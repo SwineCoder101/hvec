@@ -1,0 +1,47 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/SwineCoder101/hvec"
+rust-version = "1.85"
+
+[workspace.dependencies]
+hvec-core = { path = "crates/hvec-core" }
+hvec-connect = { path = "crates/hvec-connect", default-features = false }
+hvec-store = { path = "crates/hvec-store" }
+hvec-bench = { path = "crates/hvec-bench" }
+
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "io-std", "io-util", "sync"] }
+async-trait = "0.1"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "http2", "charset"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
+clap = { version = "4", features = ["derive", "env"] }
+dirs = "7"
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4"] }
+walkdir = "2"
+fastembed = "7"
+tempfile = "3"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+needless_pass_by_value = "warn"
+type_complexity = "allow"
+
+[profile.release]
+lto = "thin"

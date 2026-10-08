@@ -1,0 +1,32 @@
+[package]
+name = "hvec-connect"
+description = "Configurable chat-model and embedding connectors for hvec"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = ["local"]
+# Local ONNX embeddings via fastembed. Downloads a model on first use.
+local = ["dep:fastembed"]
+
+[dependencies]
+hvec-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+reqwest.workspace = true
+dirs.workspace = true
+tracing.workspace = true
+fastembed = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

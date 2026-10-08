@@ -1,0 +1,8 @@
+/target
+**/*.rs.bk
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.fastembed_cache/
+.DS_Store
