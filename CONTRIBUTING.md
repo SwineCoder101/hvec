@@ -105,7 +105,9 @@ Negative and inconclusive results are merged. They save the next person's time.
 
 To publish a finished write-up on the project site, add `docs/_experiments/<slug>.md` with
 `title`, `date` and a one-line `result` in the front matter, paste the write-up body, and link
-back to the experiment directory. Blog posts go in `docs/_posts/`. GitHub Pages rebuilds on push.
+back to the experiment directory. Blog posts go in `docs/_posts/`. Cite papers by key from
+`docs/_data/references.yml` (add missing ones there, with a DOI or arXiv link) and define new
+jargon in `docs/glossary.md`. GitHub Pages rebuilds on push.
 
 ## Code guidelines
 

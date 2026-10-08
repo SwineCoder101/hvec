@@ -1,0 +1,222 @@
+# Bibliography for the site. Posts cite entries by `key` in their front matter:
+#   references: [jegou2011pq, lewis2020rag]
+# and end with {% include references.html %}. The full list renders at /references/.
+# Keep entries factual: authors, title, venue, year, a resolvable url. `note` says why it matters here.
+
+# --- Quantization and compressed-domain search ---
+- key: jegou2011pq
+  topic: Quantization
+  authors: Hervé Jégou, Matthijs Douze, Cordelia Schmid
+  title: Product Quantization for Nearest Neighbor Search
+  venue: IEEE Transactions on Pattern Analysis and Machine Intelligence 33(1)
+  year: 2011
+  url: https://doi.org/10.1109/TPAMI.2010.57
+  note: The paper most vector-database quantizers descend from. Introduces product quantization and asymmetric distance computation, the clearest example of homomorphic compression for search.
+- key: ge2014opq
+  topic: Quantization
+  authors: Tiezheng Ge, Kaiming He, Qifa Ke, Jian Sun
+  title: Optimized Product Quantization
+  venue: IEEE Transactions on Pattern Analysis and Machine Intelligence 36(4)
+  year: 2014
+  url: https://doi.org/10.1109/TPAMI.2013.240
+  note: Learns a rotation before splitting into subspaces, cutting PQ error substantially. The usual next step after plain PQ.
+- key: babenko2014aq
+  topic: Quantization
+  authors: Artem Babenko, Victor Lempitsky
+  title: Additive Quantization for Extreme Vector Compression
+  venue: IEEE Conference on Computer Vision and Pattern Recognition (CVPR)
+  year: 2014
+  url: https://doi.org/10.1109/CVPR.2014.124
+  note: Replaces PQ's independent subspaces with sums of codewords. Higher accuracy per byte at higher encoding cost.
+- key: andre2015fastscan
+  topic: Quantization
+  authors: Fabien André, Anne-Marie Kermarrec, Nicolas Le Scouarnec
+  title: "Cache locality is not enough: High-Performance Nearest Neighbor Search with Product Quantization Fast Scan"
+  venue: Proceedings of the VLDB Endowment 9(4)
+  year: 2015
+  url: https://doi.org/10.14778/2856318.2856324
+  note: Shows how to make PQ distance lookups SIMD-friendly. Relevant once hvec cares about throughput, not just error.
+- key: guo2020scann
+  topic: Quantization
+  authors: Ruiqi Guo, Philip Sun, Erik Lindgren, Quan Geng, David Simcha, Felix Chern, Sanjiv Kumar
+  title: Accelerating Large-Scale Inference with Anisotropic Vector Quantization
+  venue: International Conference on Machine Learning (ICML)
+  year: 2020
+  url: https://arxiv.org/abs/1908.10396
+  note: Argues that quantization error should be measured by its effect on inner-product ranking, not reconstruction. Exactly the stance hvec takes one level up, at the answer.
+- key: gao2024rabitq
+  topic: Quantization
+  authors: Jianyang Gao, Cheng Long
+  title: "RaBitQ: Quantizing High-Dimensional Vectors with a Theoretical Error Bound for Approximate Nearest Neighbor Search"
+  venue: Proceedings of the ACM on Management of Data (SIGMOD)
+  year: 2024
+  url: https://arxiv.org/abs/2405.12497
+  note: A binary quantizer with a provable error bound on estimated distances. A strong modern candidate for the 1-bit codec.
+- key: gong2013itq
+  topic: Quantization
+  authors: Yunchao Gong, Svetlana Lazebnik, Albert Gordo, Florent Perronnin
+  title: "Iterative Quantization: A Procrustean Approach to Learning Binary Codes for Large-Scale Image Retrieval"
+  venue: IEEE Transactions on Pattern Analysis and Machine Intelligence 35(12)
+  year: 2013
+  url: https://doi.org/10.1109/TPAMI.2012.193
+  note: Learns a rotation that makes sign-bit binarisation less lossy. The classic learned binary code.
+- key: kusupati2022mrl
+  topic: Quantization
+  authors: Aditya Kusupati, Gantavya Bhatt, Aniket Rege, Matthew Wallingford, Aditya Sinha, Vivek Ramanujan, William Howard-Snyder, Kaifeng Chen, Sham Kakade, Prateek Jain, Ali Farhadi
+  title: Matryoshka Representation Learning
+  venue: Advances in Neural Information Processing Systems (NeurIPS)
+  year: 2022
+  url: https://arxiv.org/abs/2205.13147
+  note: Trains embeddings whose leading dimensions are usable alone. Truncation becomes a compression codec with near-zero compute.
+- key: lloyd1982kmeans
+  topic: Quantization
+  authors: Stuart P. Lloyd
+  title: Least Squares Quantization in PCM
+  venue: IEEE Transactions on Information Theory 28(2)
+  year: 1982
+  url: https://doi.org/10.1109/TIT.1982.1056489
+  note: The k-means algorithm, which trains every codebook in product quantization.
+- key: gray1984vq
+  topic: Quantization
+  authors: Robert M. Gray
+  title: Vector Quantization
+  venue: IEEE ASSP Magazine 1(2)
+  year: 1984
+  url: https://doi.org/10.1109/MASSP.1984.1162229
+  note: The tutorial that defined vector quantization as a field, decades before embeddings.
+
+# --- Sketches, hashing and indexes ---
+- key: johnson1984jl
+  topic: Sketches and indexes
+  authors: William B. Johnson, Joram Lindenstrauss
+  title: Extensions of Lipschitz mappings into a Hilbert space
+  venue: Contemporary Mathematics 26
+  year: 1984
+  url: https://doi.org/10.1090/conm/026/737400
+  note: The Johnson-Lindenstrauss lemma. Random projection preserves pairwise distances within a provable bound, which makes it a homomorphic codec for L2.
+- key: indyk1998lsh
+  topic: Sketches and indexes
+  authors: Piotr Indyk, Rajeev Motwani
+  title: "Approximate Nearest Neighbors: Towards Removing the Curse of Dimensionality"
+  venue: ACM Symposium on Theory of Computing (STOC)
+  year: 1998
+  url: https://doi.org/10.1145/276698.276876
+  note: Locality-sensitive hashing. Hash collisions as a proxy for similarity.
+- key: charikar2002simhash
+  topic: Sketches and indexes
+  authors: Moses S. Charikar
+  title: Similarity Estimation Techniques from Rounding Algorithms
+  venue: ACM Symposium on Theory of Computing (STOC)
+  year: 2002
+  url: https://doi.org/10.1145/509907.509965
+  note: SimHash. Hamming distance between sign bits of random projections estimates the angle between vectors. The theory behind binary quantization of normalised embeddings.
+- key: malkov2020hnsw
+  topic: Sketches and indexes
+  authors: Yury A. Malkov, Dmitry A. Yashunin
+  title: Efficient and Robust Approximate Nearest Neighbor Search Using Hierarchical Navigable Small World Graphs
+  venue: IEEE Transactions on Pattern Analysis and Machine Intelligence 42(4)
+  year: 2020
+  url: https://arxiv.org/abs/1603.09320
+  note: HNSW, the graph index inside most vector databases. hvec deliberately does not use an index so that codec error is measured alone.
+- key: douze2024faiss
+  topic: Sketches and indexes
+  authors: Matthijs Douze, Alexandr Guzhva, Chengqi Deng, Jeff Johnson, Gergely Szilvasy, Pierre-Emmanuel Mazaré, Maria Lomeli, Lucas Hosseini, Hervé Jégou
+  title: The Faiss library
+  venue: arXiv:2401.08281
+  year: 2024
+  url: https://arxiv.org/abs/2401.08281
+  note: The reference implementation of most quantizers above. Useful for checking that an hvec codec reproduces known numbers.
+- key: aumuller2020annb
+  topic: Sketches and indexes
+  authors: Martin Aumüller, Erik Bernhardsson, Alexander Faithfull
+  title: "ANN-Benchmarks: A Benchmarking Tool for Approximate Nearest Neighbor Algorithms"
+  venue: Information Systems 87
+  year: 2020
+  url: https://arxiv.org/abs/1807.05614
+  note: The standard recall-versus-throughput benchmark. hvec's bench is the same idea with the chat model added to the loop.
+- key: pan2023vdbsurvey
+  topic: Sketches and indexes
+  authors: James Jie Pan, Jianguo Wang, Guoliang Li
+  title: "A Comprehensive Survey on Vector Database: Storage and Retrieval Technique, Challenge"
+  venue: arXiv:2310.11703
+  year: 2023
+  url: https://arxiv.org/abs/2310.11703
+  note: A map of the vector-database landscape, including where quantization sits in the storage layer.
+
+# --- Homomorphic encryption ---
+- key: gentry2009fhe
+  topic: Homomorphic encryption
+  authors: Craig Gentry
+  title: Fully Homomorphic Encryption Using Ideal Lattices
+  venue: ACM Symposium on Theory of Computing (STOC)
+  year: 2009
+  url: https://doi.org/10.1145/1536414.1536440
+  note: The first fully homomorphic encryption scheme. The origin of the word "homomorphic" in this project's name.
+- key: cheon2017ckks
+  topic: Homomorphic encryption
+  authors: Jung Hee Cheon, Andrey Kim, Miran Kim, Yongsoo Song
+  title: Homomorphic Encryption for Arithmetic of Approximate Numbers
+  venue: ASIACRYPT
+  year: 2017
+  url: https://eprint.iacr.org/2016/421
+  note: CKKS, the scheme that supports approximate arithmetic on real-valued vectors. The natural choice for computing inner products on encrypted embeddings.
+
+# --- Embeddings and retrieval-augmented generation ---
+- key: reimers2019sbert
+  topic: Embeddings and RAG
+  authors: Nils Reimers, Iryna Gurevych
+  title: "Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks"
+  venue: Conference on Empirical Methods in Natural Language Processing (EMNLP)
+  year: 2019
+  url: https://arxiv.org/abs/1908.10084
+  note: Made dense sentence embeddings practical for similarity search.
+- key: karpukhin2020dpr
+  topic: Embeddings and RAG
+  authors: Vladimir Karpukhin, Barlas Oğuz, Sewon Min, Patrick Lewis, Ledell Wu, Sergey Edunov, Danqi Chen, Wen-tau Yih
+  title: Dense Passage Retrieval for Open-Domain Question Answering
+  venue: Conference on Empirical Methods in Natural Language Processing (EMNLP)
+  year: 2020
+  url: https://arxiv.org/abs/2004.04906
+  note: Dense retrieval for question answering with a learned bi-encoder. The retrieval half of RAG.
+- key: lewis2020rag
+  topic: Embeddings and RAG
+  authors: Patrick Lewis, Ethan Perez, Aleksandra Piktus, Fabio Petroni, Vladimir Karpukhin, Naman Goyal, Heinrich Küttler, Mike Lewis, Wen-tau Yih, Tim Rocktäschel, Sebastian Riedel, Douwe Kiela
+  title: Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks
+  venue: Advances in Neural Information Processing Systems (NeurIPS)
+  year: 2020
+  url: https://arxiv.org/abs/2005.11401
+  note: Coined "RAG". The pipeline hvec benchmarks.
+- key: xiao2023bge
+  topic: Embeddings and RAG
+  authors: Shitao Xiao, Zheng Liu, Peitian Zhang, Niklas Muennighoff
+  title: "C-Pack: Packed Resources For General Chinese Embeddings"
+  venue: arXiv:2309.07597
+  year: 2023
+  url: https://arxiv.org/abs/2309.07597
+  note: Introduces the BGE embedding models. hvec's default local embedder is bge-small-en-v1.5.
+- key: thakur2021beir
+  topic: Embeddings and RAG
+  authors: Nandan Thakur, Nils Reimers, Andreas Rücklé, Abhishek Srivastava, Iryna Gurevych
+  title: "BEIR: A Heterogeneous Benchmark for Zero-shot Evaluation of Information Retrieval Models"
+  venue: NeurIPS Datasets and Benchmarks
+  year: 2021
+  url: https://arxiv.org/abs/2104.08663
+  note: Retrieval datasets with relevance judgments. A likely source for hvec's question sets.
+
+# --- Evaluation ---
+- key: es2023ragas
+  topic: Evaluation
+  authors: Shahul Es, Jithin James, Luis Espinosa-Anke, Steven Schockaert
+  title: "Ragas: Automated Evaluation of Retrieval Augmented Generation"
+  venue: arXiv:2309.15217
+  year: 2023
+  url: https://arxiv.org/abs/2309.15217
+  note: Defines faithfulness, answer relevance and context relevance as LLM-scored metrics. The vocabulary hvec uses for generation-side KPIs.
+- key: zheng2023judge
+  topic: Evaluation
+  authors: Lianmin Zheng, Wei-Lin Chiang, Ying Sheng, Siyuan Zhuang, Zhanghao Wu, Yonghao Zhuang, Zi Lin, Zhuohan Li, Dacheng Li, Eric P. Xing, Hao Zhang, Joseph E. Gonzalez, Ion Stoica
+  title: Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena
+  venue: Advances in Neural Information Processing Systems (NeurIPS)
+  year: 2023
+  url: https://arxiv.org/abs/2306.05685
+  note: Evidence for, and known biases of, using a language model to grade answers. Read before trusting an LLM judge in a benchmark.

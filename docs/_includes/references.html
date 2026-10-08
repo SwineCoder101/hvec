@@ -1,0 +1,19 @@
+{%- comment -%}
+Renders the references a page cites. Put `references: [key1, key2]` in the front matter,
+cite in the text as [1], [2] in that order, and add {% include references.html %} at the end.
+Keys resolve against _data/references.yml.
+{%- endcomment -%}
+{%- if page.references and page.references.size > 0 -%}
+<h2 id="references">References</h2>
+<ol class="references">
+{%- for k in page.references -%}
+  {%- assign r = site.data.references | where: "key", k | first -%}
+  {%- if r %}
+  <li id="ref-{{ r.key }}">{{ r.authors }}. {% if r.url %}<a href="{{ r.url }}">{{ r.title }}</a>{% else %}{{ r.title }}{% endif %}. <em>{{ r.venue }}</em>, {{ r.year }}. <a class="ref-lib" href="{{ '/references/#' | append: r.key | relative_url }}" title="Open in the references library">library</a></li>
+  {%- else %}
+  <li>Unknown reference key <code>{{ k }}</code>. Add it to <code>docs/_data/references.yml</code>.</li>
+  {%- endif -%}
+{%- endfor %}
+</ol>
+<p><small>Terms used above are defined in the <a href="{{ '/glossary/' | relative_url }}">glossary</a>.</small></p>
+{%- endif -%}

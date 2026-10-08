@@ -25,6 +25,8 @@ defaults:
 
 header_pages:
   - experiments.md
+  - glossary.md
+  - references.md
   - about.md
 
 minima:
