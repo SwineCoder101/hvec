@@ -139,6 +139,5 @@ address on the maintainer's GitHub profile.
 
 ## License
 
-A license has not been added yet. By contributing you agree that your contribution will be
-released under the permissive license (MIT or Apache-2.0) the project adopts, and that you have
-the right to submit it.
+hvec is licensed under the [MIT License](LICENSE). By contributing you agree that your
+contribution will be released under the same license, and that you have the right to submit it.

@@ -96,6 +96,4 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 
 ## License
 
-A license has not been chosen yet. Until one is added, all rights are reserved by the author.
-A permissive license (MIT or Apache-2.0) is the intended direction. Contributions submitted
-before the license lands will be covered by it once it is added.
+hvec is released under the [MIT License](LICENSE).
