@@ -59,9 +59,11 @@ pub enum Command {
     Runs(RunsCommand),
     /// Chunk, embed and store documents in a collection.
     Ingest(IngestArgs),
-    /// Benchmarks. `bench recall` needs no chat model.
+    /// Benchmarks. `bench recall` needs no chat model; `bench run` does.
     #[command(subcommand)]
     Bench(BenchCommand),
+    /// Summarise `bench run` results by matrix cell.
+    Report(ReportArgs),
     /// Ask one question against a collection and record the run.
     Query(QueryArgs),
     /// Open the interactive shell. Same as running `hvec` with no subcommand.
@@ -115,6 +117,46 @@ pub enum RunsCommand {
 pub enum BenchCommand {
     /// Re-encode an f32 collection with other codecs and measure retrieval against the exact ranking.
     Recall(RecallArgs),
+    /// Run a question set across collections and chat profiles, scoring every answer.
+    Run(BenchRunArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct BenchRunArgs {
+    /// JSONL question set: {"id","question","answers":[..],"source"?}.
+    #[arg(short, long)]
+    pub questions: PathBuf,
+    /// Collections to run against. Each is one axis value (embedding model × codec).
+    #[arg(short, long, value_delimiter = ',', required = true)]
+    pub collections: Vec<String>,
+    /// Chat profiles to run. Defaults to `default_chat`.
+    #[arg(long, value_delimiter = ',')]
+    pub chat: Vec<String>,
+    /// Passages to retrieve per question.
+    #[arg(short, long, default_value_t = 5)]
+    pub k: usize,
+    /// Only the first N questions.
+    #[arg(long)]
+    pub limit: Option<usize>,
+    /// A label stored on every run, for example the experiment name.
+    #[arg(long)]
+    pub label: Option<String>,
+    /// Stop at the first model error instead of recording it and continuing.
+    #[arg(long)]
+    pub fail_fast: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct ReportArgs {
+    /// Only runs from this batch id (prefix). Defaults to every `bench` run.
+    #[arg(long)]
+    pub batch: Option<String>,
+    /// Only this question set (file stem).
+    #[arg(long)]
+    pub set: Option<String>,
+    /// Print cells as JSON.
+    #[arg(long)]
+    pub json: bool,
 }
 
 #[derive(Debug, Args)]

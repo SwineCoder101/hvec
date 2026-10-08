@@ -13,6 +13,7 @@ hvec-store.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true

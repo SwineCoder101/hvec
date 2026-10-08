@@ -79,6 +79,20 @@ impl Store {
         rows.collect::<std::result::Result<_, _>>().map_err(Into::into)
     }
 
+    /// Every run of one kind, oldest first. Optionally only one batch.
+    pub fn runs_by_kind(&self, kind: &str, batch: Option<&str>) -> Result<Vec<RunRow>> {
+        let pattern = batch.map(|b| format!("{b}%"));
+        let mut stmt = self.conn.prepare(
+            "SELECT id, created_at, kind, collection, chat_profile, chat_model, embed_profile, embed_model, codec, metric,
+                    metadata, metrics
+             FROM runs
+             WHERE kind = ?1 AND (?2 IS NULL OR json_extract(metadata, '$.batch') LIKE ?2)
+             ORDER BY created_at",
+        )?;
+        let rows = stmt.query_map(params![kind, pattern], row_to_run)?;
+        rows.collect::<std::result::Result<_, _>>().map_err(Into::into)
+    }
+
     /// Look up by full id or unique prefix.
     pub fn get_run(&self, id_or_prefix: &str) -> Result<RunRow> {
         let pattern = format!("{id_or_prefix}%");
@@ -131,5 +145,18 @@ mod tests {
         let back = store.get_run(&run.id[..8]).unwrap();
         assert_eq!(back, run);
         assert_eq!(store.list_runs(10).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn runs_by_kind_filters_kind_and_batch() {
+        let store = Store::open_in_memory().unwrap();
+        for (kind, batch) in [("bench", "b1"), ("bench", "b2"), ("query", "b1")] {
+            let mut r = RunRow::new(kind);
+            r.metadata = serde_json::json!({ "batch": batch });
+            store.insert_run(&r).unwrap();
+        }
+        assert_eq!(store.runs_by_kind("bench", None).unwrap().len(), 2);
+        assert_eq!(store.runs_by_kind("bench", Some("b1")).unwrap().len(), 1);
+        assert_eq!(store.runs_by_kind("recall", None).unwrap().len(), 0);
     }
 }

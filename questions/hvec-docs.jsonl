@@ -1,0 +1,12 @@
+# Questions about this repository's own documentation. Ingest README.md, CONTRIBUTING.md,
+# ROADMAP.md and docs/ into a collection, then: hvec bench run --questions questions/hvec-docs.jsonl --collections <name>
+{"id": "license", "question": "What license is hvec released under?", "answers": ["MIT"], "source": "README.md"}
+{"id": "codecs", "question": "Which codecs does hvec implement today?", "answers": ["f32, int8 and binary", "f32, int8, binary", "int8 and binary"], "source": "README.md"}
+{"id": "key-payload", "question": "Does the agent read compressed vectors?", "answers": ["no"], "source": "glossary.md"}
+{"id": "headroom", "question": "What does Headroom compress?", "answers": ["payload", "text the model reads", "tool outputs"], "source": "README.md"}
+{"id": "baseline", "question": "What is the f32 codec used for?", "answers": ["baseline"], "source": "glossary.md"}
+{"id": "recall", "question": "What does bench recall need as ground truth?", "answers": ["f32 collection", "an f32 collection"], "source": "README.md"}
+{"id": "prompt-version", "question": "What should you bump when you change the RAG prompt?", "answers": ["PROMPT_VERSION", "prompt version"], "source": "CONTRIBUTING.md"}
+{"id": "negative", "question": "Are negative experiment results merged?", "answers": ["yes"], "source": "CONTRIBUTING.md"}
+{"id": "shell-resume", "question": "Which flag resumes a shell session?", "answers": ["-s", "--session"], "source": "README.md"}
+{"id": "matrix", "question": "What are the axes of the benchmark matrix?", "answers": ["embedding model × codec × chat model × dataset", "embedding model, codec, chat model and dataset", "embedding model, codec, chat model, dataset"], "source": "README.md"}

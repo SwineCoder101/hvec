@@ -8,9 +8,10 @@ Blog and experiment write-ups: [swinecoder101.github.io/hvec](https://swinecoder
   <img src="docs/assets/homomorphic-compression.svg" width="960" alt="Animated diagram: documents and agent memory are embedded as f32 vectors, compressed by a codec into small codes, scored against an uncompressed query directly on the codes with no decode step, and the top passages flow into an agent's context window; the agent writes new memory back into the loop.">
 </p>
 
-> Status: early experimental. Phase 1 (interactive shell and CLI, model connectors, f32 baseline
-> store, run log) and the first of phase 2 (int8 and binary codecs, `bench recall`) are in place.
-> Question sets and the full matrix are next. Expect APIs and results to change without notice. Contributions and experiments are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+> Status: early experimental. Phases 1 to 3 are in place: shell and CLI, model connectors, f32,
+> int8 and binary codecs, `bench recall`, question sets, `bench run` across the matrix and
+> `report`. The first retrieval experiment is published; the first answer-level experiment needs
+> API access. Expect APIs and results to change without notice. Contributions and experiments are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## What is homomorphic compression?
 
@@ -273,26 +274,35 @@ scores are far from the exact cosine because BGE vectors are not centred, so sig
 lot. Whether that loss reaches the answer is the phase 3 question. The f32 scan is slow only
 because the baseline decodes each vector; the other codecs score the bytes directly.
 
-### Comparing codecs end to end
+### 7. Run the matrix and report
 
-Ingest the same corpus into one collection per codec, then run the same questions against each:
+Ingest the same corpus into one collection per codec, write a question set, and run every
+question against every collection and chat profile:
 
 ```sh
 hvec ingest docs/ --collection hb-f32
 hvec ingest docs/ --collection hb-int8   --codec int8
 hvec ingest docs/ --collection hb-binary --codec binary
-hvec query "What is our refund policy?" --collection hb-binary --chat ollama
+
+cat > questions/handbook.jsonl <<'JSONL'
+{"id": "q1", "question": "What is the refund window?", "answers": ["30 days", "thirty days"], "source": "refunds.md"}
+{"id": "q2", "question": "How long does standard shipping take?", "answers": ["three to five business days", "3-5 business days"], "source": "shipping.md"}
+JSONL
+
+hvec bench run --questions questions/handbook.jsonl --collections hb-f32,hb-int8,hb-binary --chat anthropic,ollama -k 5 --label exp1
+hvec report                       # every bench run, grouped by cell
+hvec report --batch 3f9a1c2e      # one batch; the id is printed by bench run
+hvec report --set handbook --json
 ```
 
-Each run records its codec, so the run log already holds the comparison. A `bench run` over a
-question set and a `report` that groups the log are the next phase; see [ROADMAP.md](ROADMAP.md).
-
-### Is this overkill?
-
-For deciding whether to switch on quantization in a production vector database: yes. Use the
-database's built-in codec with rescoring and an eval harness such as RAGAS. hvec is for
-understanding what a codec does on its own, without an index or a rescore step hiding it, and for
-measuring the effect per chat model, which nobody publishes.
+Each question becomes one `bench` row per cell with the answer, the gold answers, two cheap
+scores (`exact`: normalised answer equals a gold answer; `contains`: normalised answer contains
+one) and, when the question names a `source`, whether retrieval returned a chunk from it. Model
+errors are recorded, counted and skipped rather than aborting the batch; `--fail-fast` reverses
+that. `report` groups rows by question set, collection, embedding model, codec and chat model and
+prints accuracy, source-hit rate, latency and tokens per cell, and flags runs that a provider
+served with a different model than configured. The scores are deliberately crude; an LLM judge
+is the next phase. See [questions/README.md](questions/README.md) for the file format.
 
 ## Troubleshooting
 

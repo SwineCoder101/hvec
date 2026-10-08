@@ -17,18 +17,22 @@ integration tests, CI.
   vectors with each codec, rank self-queries or a query file, and report recall@k, top-1
   agreement and score error against f32. No chat model involved, so it is free and fast.
 - [x] `hvec ingest --codec` and per-codec collections as the unit of comparison.
-- [ ] Run it on a real embedding model and corpus and publish the first table.
+- [x] Run it on a real embedding model and corpus and publish the first table:
+  [SciFact, int8 and binary](experiments/2026-10-scifact-int8-binary/).
 
 Exit: a table of recall@10 and score error per codec for one embedding model, in the run log.
 
-## Phase 3 · Question sets and the matrix
+## Phase 3 · Question sets and the matrix (tooling done, experiment pending)
 
-- JSONL question sets with gold answers (`questions/<name>.jsonl`): `question`, `answer`,
-  optional `source` hints. A small loader and a BEIR-style importer.
-- `hvec bench run --questions <set> --collections a,b,c --chat p,q`: one run per cell, with
-  exact-match and contains-answer scoring recorded alongside the existing timings and tokens.
-- `hvec report`: group the run log by embedding model, codec and chat model; print answer
-  accuracy, recall, tokens and latency per cell.
+- [x] JSONL question sets with gold answers (`questions/<name>.jsonl`): `question`, `answers`,
+  optional `source` hint. Loader with validation.
+- [x] `hvec bench run --questions <set> --collections a,b,c --chat p,q`: one run per cell, with
+  exact and contains scoring and source-hit recorded alongside timings and tokens. Errors are
+  recorded and skipped; `--fail-fast` to abort.
+- [x] `hvec report`: group `bench` rows by question set, collection, embedding model, codec and
+  chat model; accuracy, source-hit rate, tokens and latency per cell; `--batch`, `--set`, `--json`.
+- [ ] A BEIR-style importer for question sets with relevance judgments.
+- [ ] **Experiment 1** (needs API access to two chat models).
 
 Exit: **Experiment 1**, published on the site. int8 and binary without rescoring versus f32, one
 small local embedding model, two chat models of very different size, a few hundred questions.

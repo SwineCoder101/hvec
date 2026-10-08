@@ -396,3 +396,179 @@ fn query_against_int8_and_binary_collections_records_the_codec() {
     let list = stdout(&env.run(&["collections", "list"]));
     assert!(list.contains("int8") && list.contains("binary"), "{list}");
 }
+
+#[test]
+fn bench_run_scores_answers_and_report_aggregates_cells() {
+    let env = Env::new();
+    let a = env.write_doc("refunds.md", REFUNDS);
+    let b = env.write_doc("shipping.md", SHIPPING);
+    for (col, codec) in [("qa-f32", "f32"), ("qa-bin", "binary")] {
+        assert_ok(
+            &env.run(&[
+                "ingest",
+                a.to_str().unwrap(),
+                b.to_str().unwrap(),
+                "--collection",
+                col,
+                "--codec",
+                codec,
+            ]),
+            "ingest",
+        );
+    }
+    // The mock answers "<x>" for "say exactly <x>", so q1 is correct, q2 is wrong, q3 has no gold.
+    let qs = env.write_doc(
+        "refund-qa.jsonl",
+        concat!(
+            "# refund questions\n",
+            "{\"id\":\"q1\",\"question\":\"refund window? say exactly Thirty days.\",\"answers\":[\"30 days\",\"thirty days\"],\"source\":\"refunds.md\"}\n",
+            "{\"id\":\"q2\",\"question\":\"shipping time? say exactly next week\",\"answers\":[\"three to five business days\"],\"source\":\"shipping.md\"}\n",
+            "{\"id\":\"q3\",\"question\":\"anything? say exactly whatever\"}\n",
+        ),
+    );
+    let out = env.run(&[
+        "bench",
+        "run",
+        "--questions",
+        qs.to_str().unwrap(),
+        "--collections",
+        "qa-f32,qa-bin",
+        "--chat",
+        "mock-anthropic,mock-openai",
+        "-k",
+        "1",
+        "--label",
+        "exp-test",
+    ]);
+    assert_ok(&out, "bench run");
+    let se = stderr(&out);
+    assert!(
+        se.contains("3 questions × 2 collections × 2 chat profiles = 12 runs"),
+        "{se}"
+    );
+    assert!(se.contains("12 runs recorded"), "{se}");
+    let batch = se
+        .lines()
+        .find_map(|l| l.strip_prefix("batch "))
+        .and_then(|l| l.split(':').next())
+        .expect("batch id")
+        .to_owned();
+
+    // 12 bench rows; the summary printed by `bench run` has 4 cells.
+    assert_eq!(
+        count_runs(&stdout(&env.run(&["runs", "list", "-n", "50"])), "bench"),
+        12
+    );
+    let cells_text = stdout(&out);
+    assert_eq!(
+        cells_text
+            .lines()
+            .skip(1)
+            .filter(|l| l.starts_with("refund-qa"))
+            .count(),
+        4,
+        "{cells_text}"
+    );
+
+    // Report as JSON: every cell saw 3 questions, exact 1/3 (q1), contains 1/3, source hit 1/2 (q1 yes, q2 no; q3 unhinted).
+    let out = env.run(&["report", "--batch", &batch, "--json"]);
+    assert_ok(&out, "report");
+    let cells: Vec<serde_json::Value> = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(cells.len(), 4);
+    for c in &cells {
+        assert_eq!(c["n"], 3, "{c}");
+        assert_eq!(c["errors"], 0);
+        assert!((c["exact"].as_f64().unwrap() - 1.0 / 3.0).abs() < 1e-9, "{c}");
+        assert!((c["contains"].as_f64().unwrap() - 1.0 / 3.0).abs() < 1e-9, "{c}");
+        assert_eq!(c["key"]["question_set"], "refund-qa");
+    }
+    let f32_cells: Vec<&serde_json::Value> = cells.iter().filter(|c| c["key"]["codec"] == "f32").collect();
+    assert_eq!(f32_cells.len(), 2);
+    assert_eq!(
+        f32_cells[0]["source_hit"], 1.0,
+        "f32 retrieval finds both hinted sources: {}",
+        f32_cells[0]
+    );
+    let models: Vec<&str> = cells.iter().map(|c| c["key"]["chat_model"].as_str().unwrap()).collect();
+    assert!(
+        models.contains(&"claude-opus-5-5") && models.contains(&"fake-model"),
+        "cells group by configured model: {models:?}"
+    );
+    let opus = cells
+        .iter()
+        .find(|c| c["key"]["chat_model"] == "claude-opus-5-5")
+        .unwrap();
+    assert_eq!(
+        opus["served_other"], 3,
+        "the mock reports a '-served' suffix, so every run counts as rerouted"
+    );
+
+    // Filters.
+    let out = env.run(&["report", "--batch", "nope"]);
+    assert!(stdout(&out).contains("no bench runs match"));
+    let out = env.run(&["report", "--set", "refund-qa"]);
+    assert_eq!(
+        stdout(&out).lines().filter(|l| l.starts_with("refund-qa")).count(),
+        4,
+        "{}",
+        stdout(&out)
+    );
+    assert!(
+        stdout(&out).contains("6 run(s) were served by a different model"),
+        "{}",
+        stdout(&out)
+    );
+
+    // A run row carries the question, gold answers, answer and scores.
+    let one = env.run(&["runs", "list", "-n", "1"]);
+    let id = stdout(&one)
+        .lines()
+        .nth(1)
+        .unwrap()
+        .split_whitespace()
+        .next()
+        .unwrap()
+        .to_owned();
+    let row: serde_json::Value = serde_json::from_str(&stdout(&env.run(&["runs", "show", &id]))).unwrap();
+    assert_eq!(row["kind"], "bench");
+    assert_eq!(row["metadata"]["label"], "exp-test");
+    assert_eq!(row["metadata"]["batch"], batch);
+    assert!(row["metrics"]["exact"].is_boolean() && row["metrics"]["contains"].is_boolean());
+}
+
+#[test]
+fn bench_run_records_model_errors_and_continues() {
+    let env = Env::new();
+    let a = env.write_doc("refunds.md", REFUNDS);
+    assert_ok(
+        &env.run(&["ingest", a.to_str().unwrap(), "--collection", "qa"]),
+        "ingest",
+    );
+    let qs = env.write_doc("qs.jsonl", "{\"id\":\"bad\",\"question\":\"PLEASE-REFUSE this\",\"answers\":[\"x\"]}\n{\"id\":\"good\",\"question\":\"say exactly x\",\"answers\":[\"x\"]}\n");
+    let out = env.run(&[
+        "bench",
+        "run",
+        "--questions",
+        qs.to_str().unwrap(),
+        "--collections",
+        "qa",
+    ]);
+    assert_ok(&out, "bench run with a refusal");
+    assert!(stderr(&out).contains("1 errors"), "{}", stderr(&out));
+    let cells: Vec<serde_json::Value> = serde_json::from_str(&stdout(&env.run(&["report", "--json"]))).unwrap();
+    assert_eq!(cells[0]["n"], 2);
+    assert_eq!(cells[0]["errors"], 1);
+    assert_eq!(cells[0]["exact"], 1.0, "the good run is the only one scored");
+
+    let out = env.run(&[
+        "bench",
+        "run",
+        "--questions",
+        qs.to_str().unwrap(),
+        "--collections",
+        "qa",
+        "--fail-fast",
+    ]);
+    assert!(!out.status.success());
+    assert!(stderr(&out).contains("--fail-fast"));
+}

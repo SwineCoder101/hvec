@@ -83,6 +83,10 @@ fn handle(mut stream: TcpStream, log: &Mutex<Vec<Recorded>>) {
     let body: serde_json::Value = serde_json::from_slice(&raw).unwrap_or(serde_json::Value::Null);
 
     let user_text = last_user_text(&body);
+    // "say exactly <x>" anywhere in the last user turn makes the mock answer "<x>".
+    let echo = user_text
+        .rsplit_once("say exactly ")
+        .map(|(_, rest)| rest.lines().next().unwrap_or("").trim().to_owned());
     let (status, payload) = if path.ends_with("/v1/messages") {
         if user_text.contains("PLEASE-REFUSE") {
             (
@@ -98,7 +102,7 @@ fn handle(mut stream: TcpStream, log: &Mutex<Vec<Recorded>>) {
             (
                 200,
                 serde_json::json!({
-                    "content": [{"type": "text", "text": format!("MOCK-ANTHROPIC: {n} msgs")}],
+                    "content": [{"type": "text", "text": echo.clone().unwrap_or_else(|| format!("MOCK-ANTHROPIC: {n} msgs"))}],
                     "model": format!("{}-served", body["model"].as_str().unwrap_or("?")),
                     "stop_reason": "end_turn", "stop_details": null,
                     "usage": {"input_tokens": 123, "output_tokens": 7}
@@ -111,7 +115,7 @@ fn handle(mut stream: TcpStream, log: &Mutex<Vec<Recorded>>) {
             200,
             serde_json::json!({
                 "model": body["model"],
-                "choices": [{"message": {"role": "assistant", "content": format!("MOCK-OPENAI: {n} msgs")}, "finish_reason": "stop"}],
+                "choices": [{"message": {"role": "assistant", "content": echo.unwrap_or_else(|| format!("MOCK-OPENAI: {n} msgs"))}, "finish_reason": "stop"}],
                 "usage": {"prompt_tokens": 45, "completion_tokens": 6}
             }),
         )

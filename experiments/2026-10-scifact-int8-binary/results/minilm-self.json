@@ -1,0 +1,50 @@
+[
+  {
+    "codec": "f32",
+    "metric": "cosine",
+    "k": 10,
+    "vectors": 8036,
+    "queries": 300,
+    "recall_at_k": 1.0,
+    "top1_agreement": 1.0,
+    "mean_abs_score_error": 0.0,
+    "max_abs_score_error": 0.0,
+    "bytes_per_vector": 1536,
+    "compression_ratio": 1.0,
+    "encode_ms": 1,
+    "scan_ms": 1203,
+    "baseline_scan_ms": 900
+  },
+  {
+    "codec": "int8",
+    "metric": "cosine",
+    "k": 10,
+    "vectors": 8036,
+    "queries": 300,
+    "recall_at_k": 0.9976666666666667,
+    "top1_agreement": 1.0,
+    "mean_abs_score_error": 0.0002704102946611886,
+    "max_abs_score_error": 0.0019462145864963531,
+    "bytes_per_vector": 392,
+    "compression_ratio": 3.9183674,
+    "encode_ms": 2,
+    "scan_ms": 600,
+    "baseline_scan_ms": 899
+  },
+  {
+    "codec": "binary",
+    "metric": "cosine",
+    "k": 10,
+    "vectors": 8036,
+    "queries": 300,
+    "recall_at_k": 0.7200000000000002,
+    "top1_agreement": 0.7433333333333333,
+    "mean_abs_score_error": 0.03667144736456826,
+    "max_abs_score_error": 0.2182382047176361,
+    "bytes_per_vector": 48,
+    "compression_ratio": 32.0,
+    "encode_ms": 11,
+    "scan_ms": 596,
+    "baseline_scan_ms": 899
+  }
+]
