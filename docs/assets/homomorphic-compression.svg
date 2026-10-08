@@ -1,0 +1,200 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" width="960" height="440" role="img"
+  aria-labelledby="t d">
+  <title id="t">Homomorphic compression in a RAG and agent-memory pipeline</title>
+  <desc id="d">Documents and agent memory are embedded as f32 vectors, compressed by a codec into small codes, scored against an uncompressed query directly on the codes without decoding, and the top passages flow into an agent's context window; the agent writes new memory back into the loop.</desc>
+  
+<style>
+  :root { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  text { fill: #e2e8f0; }
+  .muted { fill: #94a3b8; }
+  .tiny { font-size: 9px; fill: #cbd5e1; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .lbl { font-size: 11px; fill: #94a3b8; }
+  .hd { font-size: 12px; font-weight: 600; fill: #e2e8f0; letter-spacing: .02em; }
+  .cell { fill: #1e293b; stroke: #334155; stroke-width: 1; }
+  .card { fill: #111c33; stroke: #334155; stroke-width: 1; }
+  .q { fill: #3b2f0b; stroke: #fbbf24; }
+  .arrow { stroke: #64748b; stroke-width: 1.5; fill: none; marker-end: url(#m); }
+  .score { font-size: 11px; fill: #fbbf24; font-family: ui-monospace, Menlo, monospace; font-weight: 600; }
+  .hit { stroke: #34d399 !important; stroke-width: 2 !important; }
+  .nope { stroke: #f87171; stroke-width: 2.5; }
+  .ctx { fill: #052e22; stroke: #34d399; stroke-width: 1.5; }
+  .agent { fill: #1e1b4b; stroke: #a78bfa; stroke-width: 1.5; }
+  .ans { fill: #0f172a; stroke: #64748b; }
+  .scan { stroke: #fbbf24; stroke-width: 1.2; stroke-dasharray: 4 3; fill: none; }
+  .flow { stroke: #34d399; stroke-width: 1.5; fill: none; marker-end: url(#mg); }
+  .loop { stroke: #a78bfa; stroke-width: 1.5; fill: none; stroke-dasharray: 5 4; marker-end: url(#mp); }
+@keyframes s_cards{0%,2.14%{opacity:0}5.71%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_embed{0%,10.0%{opacity:0}13.57%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_vecs{0%,13.57%{opacity:0}17.14%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_codec{0%,24.29%{opacity:0}27.86%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_codes{0%,27.86%{opacity:0}31.43%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_dim{0%,27.86%{opacity:0}31.43%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_query{0%,38.57%{opacity:0}42.14%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_scan{0%,42.86%{opacity:0}46.43%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_scores{0%,49.29%{opacity:0}52.86%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_nope{0%,55.71%{opacity:0}59.29%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_hits{0%,60.0%{opacity:0}63.57%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_flow{0%,66.43%{opacity:0}70.0%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_ctx{0%,70.0%{opacity:0}73.57%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_agent{0%,77.14%{opacity:0}80.71%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_ans{0%,82.14%{opacity:0}85.71%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes s_loop{0%,88.57%{opacity:0}92.14%,93%{opacity:1}98%,100%{opacity:0}}
+@keyframes d_scan{0%,42.86%{stroke-dashoffset:260;opacity:0}42.87%{opacity:1}48.57%,93%{stroke-dashoffset:0;opacity:1}98%,100%{opacity:0}}
+@keyframes d_flow{0%,66.43%{stroke-dashoffset:200;opacity:0}66.44000000000001%{opacity:1}72.14%,93%{stroke-dashoffset:0;opacity:1}98%,100%{opacity:0}}
+@keyframes d_loop{0%,88.57%{stroke-dashoffset:1200;opacity:0}88.58%{opacity:1}94.29%,93%{stroke-dashoffset:0;opacity:1}98%,100%{opacity:0}}
+@keyframes s_vecs_dim{0%,13.57%{opacity:0}17.14%,27.86%{opacity:1}32.14%,93%{opacity:.35}98%,100%{opacity:0}}
+@keyframes s_hits_pulse{0%,60.0%{opacity:0}62.86%,93%{opacity:1}98%,100%{opacity:0}}
+  .a-cards { opacity:0; animation: s_cards 14s linear infinite; }
+  .a-embed { opacity:0; animation: s_embed 14s linear infinite; }
+  .a-vecs { opacity:0; animation: s_vecs 14s linear infinite; }
+  .a-codec { opacity:0; animation: s_codec 14s linear infinite; }
+  .a-codes { opacity:0; animation: s_codes 14s linear infinite; }
+  .a-dim { opacity:0; animation: s_dim 14s linear infinite; }
+  .a-query { opacity:0; animation: s_query 14s linear infinite; }
+  .a-scan { opacity:0; animation: s_scan 14s linear infinite; }
+  .a-scores { opacity:0; animation: s_scores 14s linear infinite; }
+  .a-nope { opacity:0; animation: s_nope 14s linear infinite; }
+  .a-hits { opacity:0; animation: s_hits 14s linear infinite; }
+  .a-flow { opacity:0; animation: s_flow 14s linear infinite; }
+  .a-ctx { opacity:0; animation: s_ctx 14s linear infinite; }
+  .a-agent { opacity:0; animation: s_agent 14s linear infinite; }
+  .a-ans { opacity:0; animation: s_ans 14s linear infinite; }
+  .a-loop { opacity:0; animation: s_loop 14s linear infinite; }
+  .a-vecs { animation-name: s_vecs_dim; }
+  .a-scanline { opacity:0; stroke-dasharray: 260; animation: d_scan 14s linear infinite; }
+  .a-flowline { opacity:0; stroke-dasharray: 200; animation: d_flow 14s linear infinite; }
+  .a-loopline { opacity:0; stroke-dasharray: 1200; animation: d_loop 14s linear infinite; }
+  .a-hitring { opacity:0; animation: s_hits_pulse 14s linear infinite; }
+
+  @media (prefers-reduced-motion: reduce) {
+    [class^="a-"], [class*=" a-"] { animation: none !important; opacity: 1 !important; stroke-dashoffset: 0 !important; }
+    .a-vecs { opacity: .35 !important; }
+  }
+</style>
+
+  <defs>
+    <marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#64748b"/></marker>
+    <marker id="mg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#34d399"/></marker>
+    <marker id="mp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a78bfa"/></marker>
+  </defs>
+
+  <rect width="960" height="440" rx="14" fill="#0b1220"/>
+  <text x="24" y="36" font-size="19" font-weight="700">Homomorphic compression for RAG and agent memory</text>
+  <text x="24" y="56" class="muted" font-size="12">Compute similarity on the compressed vectors. Never decompress. Measure what it does to the answer.</text>
+
+  <!-- Column headers -->
+  <text x="24" y="92" class="hd">1 · Memory &amp; documents</text>
+  <text x="236" y="92" class="hd">2 · f32 embeddings</text>
+  <text x="496" y="92" class="hd">3 · Compressed codes</text>
+  <text x="742" y="92" class="hd">4 · Agent context</text>
+
+  <!-- 1. cards -->
+  <g class="a-cards">
+    <rect class="card" x="24" y="112" width="150" height="24" rx="4"/><text class="lbl" x="34" y="128">doc chunk · refund policy</text>
+    <rect class="card" x="24" y="152" width="150" height="24" rx="4"/><text class="lbl" x="34" y="168">tool result · order #4821</text>
+    <rect class="card" x="24" y="192" width="150" height="24" rx="4"/><text class="lbl" x="34" y="208">past turn · user asked…</text>
+  </g>
+
+  <!-- embed arrow -->
+  <g class="a-embed">
+    <path class="arrow" d="M178,164 L228,164"/>
+    <text class="lbl" x="203" y="156" text-anchor="middle">embed</text>
+  </g>
+
+  <!-- 2. f32 vectors -->
+  <g class="a-vecs">
+    <rect class="cell" x="236" y="112" width="24" height="24" rx="3"/><text class="tiny" x="248.0" y="127.0" text-anchor="middle">.42</text><rect class="cell" x="262" y="112" width="24" height="24" rx="3"/><text class="tiny" x="274.0" y="127.0" text-anchor="middle">-.17</text><rect class="cell" x="288" y="112" width="24" height="24" rx="3"/><text class="tiny" x="300.0" y="127.0" text-anchor="middle">.08</text><rect class="cell" x="314" y="112" width="24" height="24" rx="3"/><text class="tiny" x="326.0" y="127.0" text-anchor="middle">.91</text><rect class="cell" x="340" y="112" width="24" height="24" rx="3"/><text class="tiny" x="352.0" y="127.0" text-anchor="middle">-.33</text><rect class="cell" x="366" y="112" width="24" height="24" rx="3"/><text class="tiny" x="378.0" y="127.0" text-anchor="middle">.25</text><rect class="cell" x="392" y="112" width="24" height="24" rx="3"/><text class="tiny" x="404.0" y="127.0" text-anchor="middle">-.06</text><rect class="cell" x="418" y="112" width="24" height="24" rx="3"/><text class="tiny" x="430.0" y="127.0" text-anchor="middle">.57</text>
+    <rect class="cell" x="236" y="152" width="24" height="24" rx="3"/><text class="tiny" x="248.0" y="167.0" text-anchor="middle">-.11</text><rect class="cell" x="262" y="152" width="24" height="24" rx="3"/><text class="tiny" x="274.0" y="167.0" text-anchor="middle">.64</text><rect class="cell" x="288" y="152" width="24" height="24" rx="3"/><text class="tiny" x="300.0" y="167.0" text-anchor="middle">.30</text><rect class="cell" x="314" y="152" width="24" height="24" rx="3"/><text class="tiny" x="326.0" y="167.0" text-anchor="middle">-.48</text><rect class="cell" x="340" y="152" width="24" height="24" rx="3"/><text class="tiny" x="352.0" y="167.0" text-anchor="middle">.02</text><rect class="cell" x="366" y="152" width="24" height="24" rx="3"/><text class="tiny" x="378.0" y="167.0" text-anchor="middle">.77</text><rect class="cell" x="392" y="152" width="24" height="24" rx="3"/><text class="tiny" x="404.0" y="167.0" text-anchor="middle">-.21</text><rect class="cell" x="418" y="152" width="24" height="24" rx="3"/><text class="tiny" x="430.0" y="167.0" text-anchor="middle">.09</text>
+    <rect class="cell" x="236" y="192" width="24" height="24" rx="3"/><text class="tiny" x="248.0" y="207.0" text-anchor="middle">.38</text><rect class="cell" x="262" y="192" width="24" height="24" rx="3"/><text class="tiny" x="274.0" y="207.0" text-anchor="middle">-.09</text><rect class="cell" x="288" y="192" width="24" height="24" rx="3"/><text class="tiny" x="300.0" y="207.0" text-anchor="middle">.12</text><rect class="cell" x="314" y="192" width="24" height="24" rx="3"/><text class="tiny" x="326.0" y="207.0" text-anchor="middle">.88</text><rect class="cell" x="340" y="192" width="24" height="24" rx="3"/><text class="tiny" x="352.0" y="207.0" text-anchor="middle">-.29</text><rect class="cell" x="366" y="192" width="24" height="24" rx="3"/><text class="tiny" x="378.0" y="207.0" text-anchor="middle">.31</text><rect class="cell" x="392" y="192" width="24" height="24" rx="3"/><text class="tiny" x="404.0" y="207.0" text-anchor="middle">-.14</text><rect class="cell" x="418" y="192" width="24" height="24" rx="3"/><text class="tiny" x="430.0" y="207.0" text-anchor="middle">.52</text>
+    <text class="lbl" x="236" y="238">… 1536 dims · 6 KB per vector</text>
+  </g>
+
+  <!-- codec arrow -->
+  <g class="a-codec">
+    <path class="arrow" d="M448,164 L488,164"/>
+    <rect x="432" y="138" width="72" height="18" rx="9" fill="#1e293b" stroke="#475569"/>
+    <text class="lbl" x="468" y="151" text-anchor="middle" style="fill:#e2e8f0">codec</text>
+  </g>
+
+  <!-- 3. codes -->
+  <g class="a-codes">
+    <rect x="496" y="118" width="11" height="11" rx="2" fill="#38bdf8"/><rect x="509" y="118" width="11" height="11" rx="2" fill="#34d399"/><rect x="522" y="118" width="11" height="11" rx="2" fill="#c084fc"/><rect x="535" y="118" width="11" height="11" rx="2" fill="#60a5fa"/><rect x="548" y="118" width="11" height="11" rx="2" fill="#a78bfa"/><rect x="561" y="118" width="11" height="11" rx="2" fill="#a78bfa"/><rect x="574" y="118" width="11" height="11" rx="2" fill="#38bdf8"/><rect x="587" y="118" width="11" height="11" rx="2" fill="#60a5fa"/>
+    <rect x="496" y="158" width="11" height="11" rx="2" fill="#f472b6"/><rect x="509" y="158" width="11" height="11" rx="2" fill="#60a5fa"/><rect x="522" y="158" width="11" height="11" rx="2" fill="#a78bfa"/><rect x="535" y="158" width="11" height="11" rx="2" fill="#c084fc"/><rect x="548" y="158" width="11" height="11" rx="2" fill="#c084fc"/><rect x="561" y="158" width="11" height="11" rx="2" fill="#a78bfa"/><rect x="574" y="158" width="11" height="11" rx="2" fill="#f472b6"/><rect x="587" y="158" width="11" height="11" rx="2" fill="#a78bfa"/>
+    <rect x="496" y="198" width="11" height="11" rx="2" fill="#c084fc"/><rect x="509" y="198" width="11" height="11" rx="2" fill="#60a5fa"/><rect x="522" y="198" width="11" height="11" rx="2" fill="#a78bfa"/><rect x="535" y="198" width="11" height="11" rx="2" fill="#f472b6"/><rect x="548" y="198" width="11" height="11" rx="2" fill="#60a5fa"/><rect x="561" y="198" width="11" height="11" rx="2" fill="#c084fc"/><rect x="574" y="198" width="11" height="11" rx="2" fill="#60a5fa"/><rect x="587" y="198" width="11" height="11" rx="2" fill="#f472b6"/>
+    <text class="lbl" x="496" y="238">int8 · binary · PQ → 4× to 32× smaller</text>
+  </g>
+
+  <!-- hit rings on rows 0 and 2 -->
+  <g class="a-hitring">
+    <rect x="492" y="114" width="112" height="19" rx="4" fill="none" stroke="#34d399" stroke-width="2"/>
+    <rect x="492" y="194" width="112" height="19" rx="4" fill="none" stroke="#34d399" stroke-width="2"/>
+  </g>
+
+  <!-- query (uncompressed) -->
+  <g class="a-query">
+    <text class="lbl" x="496" y="276" style="fill:#fbbf24">query stays f32 → "what is the refund window?"</text>
+    <rect class="cell q" x="496" y="284" width="24" height="24" rx="3"/><text class="tiny" x="508.0" y="299.0" text-anchor="middle">.40</text><rect class="cell q" x="522" y="284" width="24" height="24" rx="3"/><text class="tiny" x="534.0" y="299.0" text-anchor="middle">-.15</text><rect class="cell q" x="548" y="284" width="24" height="24" rx="3"/><text class="tiny" x="560.0" y="299.0" text-anchor="middle">.10</text><rect class="cell q" x="574" y="284" width="24" height="24" rx="3"/><text class="tiny" x="586.0" y="299.0" text-anchor="middle">.89</text><rect class="cell q" x="600" y="284" width="24" height="24" rx="3"/><text class="tiny" x="612.0" y="299.0" text-anchor="middle">-.30</text><rect class="cell q" x="626" y="284" width="24" height="24" rx="3"/><text class="tiny" x="638.0" y="299.0" text-anchor="middle">.27</text><rect class="cell q" x="652" y="284" width="24" height="24" rx="3"/><text class="tiny" x="664.0" y="299.0" text-anchor="middle">-.08</text><rect class="cell q" x="678" y="284" width="24" height="24" rx="3"/><text class="tiny" x="690.0" y="299.0" text-anchor="middle">.55</text>
+  </g>
+
+  <!-- scan lines from query to codes -->
+  <g>
+    <path class="scan a-scanline" d="M530,284 C560,250 590,200 606,124"/>
+    <path class="scan a-scanline" d="M600,284 C604,250 606,220 606,164"/>
+    <path class="scan a-scanline" d="M670,284 C650,260 620,230 606,204"/>
+  </g>
+
+  <!-- scores -->
+  <g class="a-scores">
+    <text class="score" x="616" y="128">0.91</text>
+    <text class="score" x="616" y="168">0.33</text>
+    <text class="score" x="616" y="208">0.87</text>
+  </g>
+
+  <!-- decode: crossed out -->
+  <g class="a-nope">
+    <rect x="496" y="328" width="76" height="20" rx="4" fill="#1e293b" stroke="#475569"/>
+    <text class="lbl" x="534" y="342" text-anchor="middle">decode()</text>
+    <path class="nope" d="M500,330 L568,346 M568,330 L500,346"/>
+    <text class="lbl" x="582" y="342">no decompression · scored directly on the codes</text>
+  </g>
+
+  <!-- flow into context window -->
+  <g>
+    <path class="flow a-flowline" d="M640,124 C690,124 700,130 740,130"/>
+    <path class="flow a-flowline" d="M640,204 C690,204 700,160 740,160"/>
+  </g>
+
+  <!-- 4. context window -->
+  <g class="a-ctx">
+    <rect class="ctx" x="742" y="104" width="194" height="92" rx="6"/>
+    <text class="lbl" x="752" y="120" style="fill:#34d399">context window</text>
+    <rect class="card" x="752" y="126" width="174" height="22" rx="3"/><text class="lbl" x="760" y="141">[1] refund policy · 0.91</text>
+    <rect class="card" x="752" y="152" width="174" height="22" rx="3"/><text class="lbl" x="760" y="167">[2] past turn · 0.87</text>
+    <text class="tiny" x="752" y="190">+ system prompt + question</text>
+  </g>
+
+  <!-- agent -->
+  <g class="a-agent">
+    <path class="arrow" d="M839,198 L839,226"/>
+    <rect class="agent" x="742" y="228" width="194" height="34" rx="6"/>
+    <text x="839" y="250" text-anchor="middle" font-size="12" font-weight="600" style="fill:#c4b5fd">LLM · agent step</text>
+  </g>
+
+  <!-- answer -->
+  <g class="a-ans">
+    <path class="arrow" d="M839,264 L839,290"/>
+    <rect class="ans" x="742" y="292" width="194" height="40" rx="6"/>
+    <text class="lbl" x="752" y="309" style="fill:#e2e8f0">"Refunds within 30 days [1]."</text>
+    <text class="tiny" x="752" y="324">same answer as f32? → run log</text>
+  </g>
+
+  <!-- loop back: agent writes new memory -->
+  <g>
+    <path class="loop a-loopline" d="M936,245 C950,245 950,262 950,300 L950,382 C950,404 936,404 910,404 L120,404 C80,404 60,300 60,232"/>
+  </g>
+  <g class="a-loop">
+    <text class="lbl" x="400" y="392" text-anchor="middle" style="fill:#c4b5fd">agent writes new memory → embedded → compressed → retrievable next step</text>
+  </g>
+
+  <text x="24" y="430" class="muted" font-size="11">hvec · github.com/SwineCoder101/hvec · benchmark: embedding model × codec × chat model × dataset</text>
+</svg>

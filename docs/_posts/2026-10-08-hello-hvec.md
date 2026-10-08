@@ -13,6 +13,11 @@ are consumed by a language model that may or may not notice a slightly worse ran
 version of this argument one level down, measuring quantization error by its effect on ranking
 rather than on reconstruction [2]. hvec moves it one level up, to the answer.
 
+<figure>
+  <img src="{{ '/assets/homomorphic-compression.svg' | relative_url }}" width="960" alt="Animated diagram of homomorphic compression in a RAG and agent-memory loop">
+  <figcaption>The loop hvec measures. Memory and documents become f32 embeddings, a codec shrinks them, the query is scored directly on the compressed codes with no decode step, and the top passages enter the agent's context. The agent's new memory goes back through the same path. Fourteen-second loop; honours reduced-motion settings.</figcaption>
+</figure>
+
 hvec exists to measure the direct thing: run the same questions through the same pipeline with
 different codecs and different chat models, and compare the answers, the latency, and the token
 cost. The benchmark is a matrix of embedding model × codec × chat model × dataset. Compression

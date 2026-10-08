@@ -4,6 +4,10 @@
 
 Blog and experiment write-ups: [swinecoder101.github.io/hvec](https://swinecoder101.github.io/hvec/)
 
+<p align="center">
+  <img src="docs/assets/homomorphic-compression.svg" width="960" alt="Animated diagram: documents and agent memory are embedded as f32 vectors, compressed by a codec into small codes, scored against an uncompressed query directly on the codes with no decode step, and the top passages flow into an agent's context window; the agent writes new memory back into the loop.">
+</p>
+
 > Status: early experimental. Milestone 1 (interactive shell and CLI, model connectors, f32 baseline
 > store, run log) is in place. Compression codecs and the benchmark matrix are next. Expect APIs and results to change
 > without notice. Contributions and experiments are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
