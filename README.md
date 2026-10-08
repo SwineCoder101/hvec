@@ -2,8 +2,8 @@
 
 **A Rust sandbox for homomorphic compression of embedding vectors, aimed at vector databases.**
 
-> Status: early experimental. Milestone 1 (CLI, model connectors, f32 baseline store, run log) is
-> in place. Compression codecs and the benchmark matrix are next. Expect APIs and results to change
+> Status: early experimental. Milestone 1 (interactive shell and CLI, model connectors, f32 baseline
+> store, run log) is in place. Compression codecs and the benchmark matrix are next. Expect APIs and results to change
 > without notice. Contributions and experiments are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## What is homomorphic compression?
@@ -87,12 +87,61 @@ cargo test
 ```
 
 The binary is at `target/release/hvec`. Put it on your `PATH` or run it as `cargo run --release --`.
+Then type `hvec`. With no subcommand it writes a starter config if needed and opens an interactive
+session. The sections below describe that shell and the scriptable subcommands behind it.
 
 The default build includes the local embedding backend, which pulls in ONNX Runtime. If you only
 want remote embedders, build with `cargo build --release --no-default-features`. See
 [Troubleshooting](#troubleshooting) for the macOS SDK requirement.
 
 ## How to use the CLI
+
+### The interactive shell
+
+```sh
+export ANTHROPIC_API_KEY=sk-ant-...
+hvec
+```
+
+```
+hvec 0.1.0 | config ~/.config/hvec/config.toml | db ~/.local/share/hvec/hvec.db
+session    20261008-161918 (0 messages)
+collection none (plain chat, no retrieval; use /use <collection>)
+chat       anthropic (claude-opus-5-5) | k=5 | show-context=false
+Type a question, or /help for commands. Ctrl-D or /quit to exit.
+
+hvec> /new handbook docs/
+ingested 212 chunks from 31 files into `handbook` in 4.1s (384 dims, codec f32, 212 chunks total)
+hvec[handbook]> What is our refund policy?
+...
+[claude-opus-5-5 | f32 | k=5 | embed 8ms, retrieve 1ms, generate 2310ms | 1480 in / 212 out tokens | recorded]
+```
+
+Plain text is a question. If a collection is selected the shell retrieves passages first and
+records the turn in the run log; without one it is plain chat and nothing is recorded. Every
+launch creates a new timestamped session unless you pass `-s <name>`, and the transcript is saved
+so `hvec -s <name>` resumes it. If exactly one collection exists it is selected automatically.
+
+| Command | Effect |
+|---|---|
+| `/use <name>`, `/use none` | Select a collection, or turn retrieval off |
+| `/new <name> <paths...>` | Create a collection by ingesting files or directories |
+| `/ingest <paths...>` | Add files to the current collection |
+| `/model [name]` | List chat profiles, or switch to one for the next turn |
+| `/session <name>` | Switch to or create a session |
+| `/k <n>` | Passages to retrieve per turn |
+| `/context` | Toggle printing the retrieved passages |
+| `/status`, `/collections`, `/sessions`, `/runs [n]`, `/embedders` | Inspect state |
+| `/quit` | Exit. Ctrl-D works too |
+
+Switching models inside one session is the point: ask the same question under `/model anthropic`
+and `/model ollama` and both turns land in the run log with the same session name and collection.
+
+Flags: `hvec -s <session> -c <collection> --chat <profile> -k <n>`. `hvec chat` is an alias.
+
+### Scriptable subcommands
+
+Everything the shell does is also a subcommand, for scripts and benchmarks.
 
 ### 1. Create a config
 
@@ -145,12 +194,11 @@ get the whole record on stdout, or `--no-record` to skip the log.
 ### 4. Hold a conversation
 
 ```sh
-hvec chat --session onboarding --collection handbook
+hvec -s onboarding -c handbook
 ```
 
-Each turn retrieves fresh context for the new question while the earlier turns are replayed as
-plain history. Sessions persist in the database; run the same command again to resume. Type
-`/quit` or press Ctrl-D to leave.
+This is the shell described above. Each turn retrieves fresh context for the new question while
+the earlier turns are replayed as plain history. Run the same command again to resume.
 
 ```sh
 hvec sessions list

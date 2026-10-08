@@ -1,8 +1,8 @@
-pub mod chat;
 pub mod config;
 pub mod ingest;
 pub mod list;
 pub mod query;
+pub mod shell;
 
 /// Shared retrieve-then-answer step used by `query` and `chat`.
 pub mod rag {

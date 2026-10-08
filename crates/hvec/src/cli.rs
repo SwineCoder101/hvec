@@ -5,7 +5,8 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
-#[command(name = "hvec", version, about, long_about = None)]
+#[command(name = "hvec", version, about, long_about = None, args_conflicts_with_subcommands = true)]
+#[command(after_help = "Run `hvec` with no subcommand to open the interactive shell.")]
 pub struct Cli {
     /// Path to the config file. Defaults to $HVEC_CONFIG or the platform config dir.
     #[arg(long, global = true, env = "HVEC_CONFIG")]
@@ -15,8 +16,29 @@ pub struct Cli {
     #[arg(short, long, global = true, action = clap::ArgAction::Count)]
     pub verbose: u8,
 
+    /// Options for the interactive shell, used when no subcommand is given.
+    #[command(flatten)]
+    pub shell: ShellArgs,
+
     #[command(subcommand)]
-    pub command: Command,
+    pub command: Option<Command>,
+}
+
+/// Flags for the interactive shell (bare `hvec`) and the `chat` alias.
+#[derive(Debug, Clone, Args)]
+pub struct ShellArgs {
+    /// Session to resume or create. Defaults to a new timestamped session.
+    #[arg(short, long)]
+    pub session: Option<String>,
+    /// Collection to retrieve from. Defaults to the only collection if exactly one exists.
+    #[arg(short, long)]
+    pub collection: Option<String>,
+    /// Chat profile. Defaults to `default_chat` in config.
+    #[arg(long)]
+    pub chat: Option<String>,
+    /// Number of passages to retrieve per turn.
+    #[arg(short, long, default_value_t = 5)]
+    pub k: usize,
 }
 
 #[derive(Debug, Subcommand)]
@@ -39,8 +61,8 @@ pub enum Command {
     Ingest(IngestArgs),
     /// Ask one question against a collection and record the run.
     Query(QueryArgs),
-    /// Interactive multi-turn chat with retrieval, persisted as a session.
-    Chat(ChatArgs),
+    /// Open the interactive shell. Same as running `hvec` with no subcommand.
+    Chat(ShellArgs),
 }
 
 #[derive(Debug, Clone, Copy, Subcommand)]
@@ -136,20 +158,4 @@ pub struct QueryArgs {
     /// Print the full run record as JSON instead of a summary.
     #[arg(long)]
     pub json: bool,
-}
-
-#[derive(Debug, Args)]
-pub struct ChatArgs {
-    /// Session name. Created if missing; resumed otherwise.
-    #[arg(short, long)]
-    pub session: String,
-    /// Collection to retrieve from.
-    #[arg(short, long)]
-    pub collection: String,
-    /// Chat profile. Defaults to `default_chat` in config.
-    #[arg(long)]
-    pub chat: Option<String>,
-    /// Number of passages to retrieve per turn.
-    #[arg(short, long, default_value_t = 5)]
-    pub k: usize,
 }

@@ -32,6 +32,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4"] }
 walkdir = "2"
 fastembed = "7"
+rustyline = { version = "18", default-features = false, features = ["with-file-history"] }
 tempfile = "3"
 
 [workspace.lints.rust]

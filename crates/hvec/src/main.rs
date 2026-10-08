@@ -14,7 +14,10 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     init_tracing(cli.verbose);
 
-    match cli.command {
+    let Some(command) = cli.command else {
+        return commands::shell::run(&cli.config, cli.shell).await;
+    };
+    match command {
         Command::Config(cmd) => commands::config::run(&cli.config, cmd),
         Command::Embedders => commands::list::embedders(),
         Command::Collections(cmd) => commands::list::collections(&cli.config, cmd),
@@ -22,7 +25,7 @@ async fn main() -> Result<()> {
         Command::Runs(cmd) => commands::list::runs(&cli.config, cmd),
         Command::Ingest(args) => commands::ingest::run(&cli.config, args).await,
         Command::Query(args) => commands::query::run(&cli.config, args).await,
-        Command::Chat(args) => commands::chat::run(&cli.config, args).await,
+        Command::Chat(args) => commands::shell::run(&cli.config, args).await,
     }
 }
 

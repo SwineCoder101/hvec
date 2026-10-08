@@ -20,6 +20,18 @@ impl Ctx {
         Ok(Self { config_path, config })
     }
 
+    /// Like `load`, but writes the starter config first when none exists.
+    pub fn load_or_init(config_override: Option<&Path>) -> Result<Self> {
+        let config_path = config_override
+            .map(Path::to_path_buf)
+            .unwrap_or_else(Config::default_path);
+        if !config_path.exists() {
+            Config::write_starter(&config_path)?;
+            eprintln!("wrote starter config to {}", config_path.display());
+        }
+        Self::load(Some(&config_path))
+    }
+
     pub fn open_store(&self) -> Result<Store> {
         let path = self.config.db_path();
         Store::open(&path).with_context(|| format!("opening database at {}", path.display()))
