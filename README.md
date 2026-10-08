@@ -2,6 +2,8 @@
 
 **A Rust sandbox for homomorphic compression of embedding vectors, aimed at vector databases.**
 
+Blog and experiment write-ups: [swinecoder101.github.io/hvec](https://swinecoder101.github.io/hvec/)
+
 > Status: early experimental. Milestone 1 (interactive shell and CLI, model connectors, f32 baseline
 > store, run log) is in place. Compression codecs and the benchmark matrix are next. Expect APIs and results to change
 > without notice. Contributions and experiments are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -248,6 +250,7 @@ embedding model. Ingest into a new collection name instead.
 
 Each experiment lives in its own directory under `experiments/` and ships with a short write-up:
 the hypothesis, the dataset, the baseline, the metric, and the result. Negative results are kept.
+Finished write-ups are published on the [project site](https://swinecoder101.github.io/hvec/experiments/).
 See the experiment section of [CONTRIBUTING.md](CONTRIBUTING.md) for the template.
 
 ## Contributing

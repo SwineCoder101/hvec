@@ -103,6 +103,10 @@ What surprised you. What you would try next. What is wrong with this experiment.
 
 Negative and inconclusive results are merged. They save the next person's time.
 
+To publish a finished write-up on the project site, add `docs/_experiments/<slug>.md` with
+`title`, `date` and a one-line `result` in the front matter, paste the write-up body, and link
+back to the experiment directory. Blog posts go in `docs/_posts/`. GitHub Pages rebuilds on push.
+
 ## Code guidelines
 
 - **Keep the codec trait honest.** A codec must declare which operations it preserves and with

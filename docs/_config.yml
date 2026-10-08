@@ -1,0 +1,37 @@
+title: hvec
+description: Benchmarking homomorphic vector compression against real RAG pipelines, in Rust.
+url: "https://swinecoder101.github.io"
+baseurl: "/hvec"
+theme: minima
+markdown: kramdown
+permalink: /blog/:year/:month/:day/:title/
+
+collections:
+  experiments:
+    output: true
+    permalink: /experiments/:name/
+
+defaults:
+  - scope:
+      path: ""
+      type: posts
+    values:
+      layout: post
+  - scope:
+      path: ""
+      type: experiments
+    values:
+      layout: page
+
+header_pages:
+  - experiments.md
+  - about.md
+
+minima:
+  date_format: "%Y-%m-%d"
+  social_links:
+    github: SwineCoder101
+
+show_excerpts: true
+exclude:
+  - README.md
