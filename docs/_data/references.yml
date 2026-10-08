@@ -203,6 +203,23 @@
   url: https://arxiv.org/abs/2104.08663
   note: Retrieval datasets with relevance judgments. A likely source for hvec's question sets.
 
+- key: morris2023vec2text
+  topic: Embeddings and RAG
+  authors: John X. Morris, Volodymyr Kuleshov, Vitaly Shmatikov, Alexander M. Rush
+  title: Text Embeddings Reveal (Almost) As Much As Text
+  venue: Conference on Empirical Methods in Natural Language Processing (EMNLP)
+  year: 2023
+  url: https://arxiv.org/abs/2310.06816
+  note: Inverts embeddings back to text with high fidelity for short inputs. Evidence that an embedding is a literal compressed representation, not an opaque fingerprint.
+- key: jiang2023llmlingua
+  topic: Embeddings and RAG
+  authors: Huiqiang Jiang, Qianhui Wu, Chin-Yew Lin, Yuqing Yang, Lili Qiu
+  title: "LLMLingua: Compressing Prompts for Accelerated Inference of Large Language Models"
+  venue: Conference on Empirical Methods in Natural Language Processing (EMNLP)
+  year: 2023
+  url: https://arxiv.org/abs/2310.05736
+  note: Compresses the text the model reads, not the vectors it retrieves by. The payload-compression layer, which hvec deliberately leaves out of scope.
+
 # --- Evaluation ---
 - key: es2023ragas
   topic: Evaluation

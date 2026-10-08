@@ -57,6 +57,22 @@ the tool. Papers are linked by key into the [references]({{ "/references/" | rel
   the metric directly on the compressed bytes. Every collection is stored through one codec and
   records its name (`f32`, later `int8`, `binary`, `pq`).
 
+**Embedding as compression**
+: An embedding model is itself a lossy codec: it keeps one operation, semantic similarity, and
+  discards the rest, including easy readability. It does not save bytes. A 200-word chunk is about
+  1 KB of text; its 1536-dimension f32 embedding is 6 KB. What it compresses is the cost of
+  comparing two passages, from "read both" to one dot product. Embeddings are more reversible than
+  they look ([morris2023vec2text]({{ "/references/#morris2023vec2text" | relative_url }})). hvec's codecs are a second layer applied to
+  this first one, preserving the same operation while giving the bytes back.
+
+**Key versus payload**
+: In retrieval the **key** is what you search by (the vector) and the **payload** is what you get
+  back (the chunk text). hvec compresses the key only. The agent never reads a vector, compressed
+  or not; it reads the payload text that the retrieval step returns, uncompressed, into its context
+  window. Compressing the payload itself (summarising or pruning passages before the model reads
+  them, as in [jiang2023llmlingua]({{ "/references/#jiang2023llmlingua" | relative_url }})) is a separate layer that changes what the agent
+  sees rather than what it finds. It is out of scope for hvec today.
+
 **Homomorphic compression**
 : A compression scheme is homomorphic with respect to an operation when you can apply the
   operation to the compressed form and get the same result, or a controlled approximation, as on
