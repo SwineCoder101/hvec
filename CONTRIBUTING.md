@@ -37,9 +37,27 @@ Before pushing, run the same checks CI will run:
 
 ```sh
 cargo fmt --all -- --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo build -p hvec --no-default-features   # the remote-only build must keep compiling
 ```
+
+Formatting is settled by the `rustfmt.toml` at the root (120 columns). On macOS, if the link step
+fails on CoreML symbols, see the Troubleshooting section of the README for the `SDKROOT` fix.
+
+## Where things go
+
+- `hvec-core`: the `Codec` trait, `Metric`, reference distance kernels. No I/O, no async.
+- `hvec-codecs` lives inside `hvec-core::codecs` for now and will split out when there are
+  several. New codecs go there with tests against the f32 baseline.
+- `hvec-connect`: provider connectors behind `ChatModel` and `Embedder`. One module per protocol.
+  Add a new provider by implementing the trait and extending the `ChatProvider` /
+  `EmbedProvider` enums and the starter config.
+- `hvec-store`: SQLite only. Scoring goes through the codec; no decoding shortcuts in search.
+- `hvec-bench`: anything that must stay fixed across runs for results to be comparable:
+  chunking, the prompt, metrics, run record shapes. Bump `PROMPT_VERSION` if you change the prompt.
+- `hvec`: thin command handlers. Logic that could be tested without a terminal belongs in a
+  library crate.
 
 ## Proposing an experiment
 
