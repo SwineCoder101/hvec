@@ -228,6 +228,14 @@ question and the answer. This table is the raw material for the benchmark matrix
 Only the `f32` baseline exists today. The intended workflow once more codecs land is to ingest the
 same corpus into one collection per codec, run the same question set against each with the same
 chat model, and compare the run log rows. The `bench` and `report` subcommands will automate that.
+The phases are laid out in [ROADMAP.md](ROADMAP.md).
+
+### Is this overkill?
+
+For deciding whether to switch on quantization in a production vector database: yes. Use the
+database's built-in codec with rescoring and an eval harness such as RAGAS. hvec is for
+understanding what a codec does on its own, without an index or a rescore step hiding it, and for
+measuring the effect per chat model, which nobody publishes.
 
 ## Troubleshooting
 
@@ -257,10 +265,24 @@ the hypothesis, the dataset, the baseline, the metric, and the result. Negative 
 Finished write-ups are published on the [project site](https://swinecoder101.github.io/hvec/experiments/).
 See the experiment section of [CONTRIBUTING.md](CONTRIBUTING.md) for the template.
 
+## Testing
+
+```sh
+cargo test --workspace
+```
+
+Unit tests cover the codec, distance kernels, chunker, metrics, config and store. Integration
+tests in `crates/hvec/tests/` drive the real binary through ingest, query, chat, sessions and the
+run log against an in-process mock of the Anthropic and OpenAI APIs, using a deterministic
+word-hashing embedder so no model download or API key is needed. They assert the wire format of
+every request, the run-log contents, session persistence and refusal handling. CI runs them on
+every push.
+
 ## Contributing
 
 Bug reports, experiment proposals, benchmark additions, and documentation fixes are all welcome.
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. The plan is in
+[ROADMAP.md](ROADMAP.md).
 
 ## License
 

@@ -117,6 +117,9 @@ jargon in `docs/glossary.md`. GitHub Pages rebuilds on push.
   and is tested against it.
 - **Test against the reference.** Every compressed-domain distance needs a test comparing it to
   the uncompressed f32 result on random vectors with a stated tolerance.
+- **Test the pipeline end to end.** Anything that changes what a run records, how a request is
+  built, or how the shell behaves needs an integration test in `crates/hvec/tests/`. The mock
+  server and the `hash` embedder in `tests/support` make these free to run; no key, no download.
 - **Benchmark with criterion** or the project harness. Do not paste numbers from a one-off
   `println!` into a write-up.
 - **No new dependencies without a reason** stated in the pull request.

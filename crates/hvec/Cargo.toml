@@ -32,5 +32,8 @@ walkdir.workspace = true
 chrono.workspace = true
 rustyline.workspace = true
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [lints]
 workspace = true

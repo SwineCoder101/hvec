@@ -6,6 +6,7 @@
 pub mod anthropic;
 pub mod config;
 pub mod error;
+pub mod hash;
 #[cfg(feature = "local")]
 pub mod local;
 pub mod openai;
@@ -32,6 +33,7 @@ pub async fn embedder(config: &Config, profile_name: &str) -> Result<Arc<dyn Emb
     let profile = config.embed_profile(profile_name)?;
     let embedder: Arc<dyn Embedder> = match profile.provider {
         EmbedProvider::Openai => Arc::new(openai::OpenAiEmbedder::from_profile(profile_name, profile).await?),
+        EmbedProvider::Hash => Arc::new(hash::HashEmbedder::from_profile(profile_name, profile)?),
         #[cfg(feature = "local")]
         EmbedProvider::Local => Arc::new(local::LocalEmbedder::from_profile(profile_name, profile).await?),
         #[cfg(not(feature = "local"))]

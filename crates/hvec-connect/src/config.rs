@@ -85,6 +85,8 @@ pub enum EmbedProvider {
     Local,
     /// Any OpenAI-compatible `/embeddings` endpoint.
     Openai,
+    /// Deterministic word-hashing vectors. For tests and CI only; no semantics.
+    Hash,
 }
 
 /// An embedding model profile.

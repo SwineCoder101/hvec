@@ -66,3 +66,10 @@ provider = "openai"
 model = "nomic-embed-text"
 base_url = "http://localhost:11434/v1"
 dimension = 768
+
+# Deterministic word-hashing vectors with no semantics. Only for tests, CI and
+# smoke-testing the pipeline without a model download. Never for a benchmark.
+# [embed.hash]
+# provider = "hash"
+# model = "hash-256"
+# dimension = 256
