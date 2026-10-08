@@ -59,6 +59,9 @@ pub enum Command {
     Runs(RunsCommand),
     /// Chunk, embed and store documents in a collection.
     Ingest(IngestArgs),
+    /// Benchmarks. `bench recall` needs no chat model.
+    #[command(subcommand)]
+    Bench(BenchCommand),
     /// Ask one question against a collection and record the run.
     Query(QueryArgs),
     /// Open the interactive shell. Same as running `hvec` with no subcommand.
@@ -108,6 +111,37 @@ pub enum RunsCommand {
     Show { id: String },
 }
 
+#[derive(Debug, Subcommand)]
+pub enum BenchCommand {
+    /// Re-encode an f32 collection with other codecs and measure retrieval against the exact ranking.
+    Recall(RecallArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct RecallArgs {
+    /// An f32 collection to use as ground truth.
+    #[arg(short, long)]
+    pub collection: String,
+    /// Codecs to evaluate.
+    #[arg(long, value_delimiter = ',', default_value = "int8,binary")]
+    pub codecs: Vec<String>,
+    /// Neighbours per query.
+    #[arg(short, long, default_value_t = 10)]
+    pub k: usize,
+    /// How many stored vectors to use as self-queries (each excludes itself).
+    #[arg(long, default_value_t = 100)]
+    pub sample: usize,
+    /// A text file with one query per line, embedded with the collection's embedder, instead of self-queries.
+    #[arg(long)]
+    pub queries: Option<PathBuf>,
+    /// Do not write the results to the run log.
+    #[arg(long)]
+    pub no_record: bool,
+    /// Print the reports as JSON instead of a table.
+    #[arg(long)]
+    pub json: bool,
+}
+
 #[derive(Debug, Args)]
 pub struct IngestArgs {
     /// Files or directories to ingest. Directories are walked recursively.
@@ -119,7 +153,7 @@ pub struct IngestArgs {
     /// Embedding profile. Defaults to `default_embedder` in config.
     #[arg(short, long)]
     pub embedder: Option<String>,
-    /// Codec used to store vectors.
+    /// Codec used to store vectors: f32, int8 or binary.
     #[arg(long, default_value = "f32")]
     pub codec: String,
     /// Words per chunk.

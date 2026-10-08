@@ -118,6 +118,8 @@ pub trait Codec: Send + Sync + std::fmt::Debug {
 pub fn codec_by_name(name: &str, dimension: usize) -> Result<Box<dyn Codec>, CodecError> {
     match name {
         "f32" => Ok(Box::new(codecs::F32Codec::new(dimension))),
+        "int8" => Ok(Box::new(codecs::Int8Codec::new(dimension))),
+        "binary" => Ok(Box::new(codecs::BinaryCodec::new(dimension))),
         other => Err(CodecError::UnknownCodec(other.to_owned())),
     }
 }
@@ -125,5 +127,5 @@ pub fn codec_by_name(name: &str, dimension: usize) -> Result<Box<dyn Codec>, Cod
 /// Names of every codec this build knows about.
 #[must_use]
 pub fn codec_names() -> &'static [&'static str] {
-    &["f32"]
+    &["f32", "int8", "binary"]
 }

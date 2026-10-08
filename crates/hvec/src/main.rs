@@ -24,6 +24,7 @@ async fn main() -> Result<()> {
         Command::Sessions(cmd) => commands::list::sessions(&cli.config, cmd),
         Command::Runs(cmd) => commands::list::runs(&cli.config, cmd),
         Command::Ingest(args) => commands::ingest::run(&cli.config, args).await,
+        Command::Bench(cmd) => commands::bench::run(&cli.config, cmd).await,
         Command::Query(args) => commands::query::run(&cli.config, args).await,
         Command::Chat(args) => commands::shell::run(&cli.config, args).await,
     }

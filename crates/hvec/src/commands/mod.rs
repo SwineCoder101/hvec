@@ -1,3 +1,4 @@
+pub mod bench;
 pub mod config;
 pub mod ingest;
 pub mod list;

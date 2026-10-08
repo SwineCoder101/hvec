@@ -9,14 +9,15 @@ Workspace, `Codec` trait with the f32 baseline, Anthropic / OpenAI-compatible / 
 connectors, SQLite store scored through the codec, run log, interactive shell, mock-server
 integration tests, CI.
 
-## Phase 2 · Codecs and retrieval-only measurement
+## Phase 2 · Codecs and retrieval-only measurement (in progress)
 
-- `int8` scalar codec (per-vector scale and offset) and `binary` sign codec, both with
+- [x] `int8` scalar codec (per-vector scale and offset) and `binary` sign codec, both with
   compressed-domain `score` and tests against the f32 reference on random vectors.
-- `hvec bench recall --collection <name> --codecs int8,binary`: re-encode the collection's
-  vectors with each codec, sample stored chunks as queries, and report recall@k and mean score
-  error against f32. No chat model involved, so it is free and fast.
-- `hvec ingest --codec` already exists; collections per codec become the unit of comparison.
+- [x] `hvec bench recall --collection <name> --codecs int8,binary`: re-encode the collection's
+  vectors with each codec, rank self-queries or a query file, and report recall@k, top-1
+  agreement and score error against f32. No chat model involved, so it is free and fast.
+- [x] `hvec ingest --codec` and per-codec collections as the unit of comparison.
+- [ ] Run it on a real embedding model and corpus and publish the first table.
 
 Exit: a table of recall@10 and score error per codec for one embedding model, in the run log.
 

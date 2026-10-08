@@ -8,9 +8,9 @@ Blog and experiment write-ups: [swinecoder101.github.io/hvec](https://swinecoder
   <img src="docs/assets/homomorphic-compression.svg" width="960" alt="Animated diagram: documents and agent memory are embedded as f32 vectors, compressed by a codec into small codes, scored against an uncompressed query directly on the codes with no decode step, and the top passages flow into an agent's context window; the agent writes new memory back into the loop.">
 </p>
 
-> Status: early experimental. Milestone 1 (interactive shell and CLI, model connectors, f32 baseline
-> store, run log) is in place. Compression codecs and the benchmark matrix are next. Expect APIs and results to change
-> without notice. Contributions and experiments are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+> Status: early experimental. Phase 1 (interactive shell and CLI, model connectors, f32 baseline
+> store, run log) and the first of phase 2 (int8 and binary codecs, `bench recall`) are in place.
+> Question sets and the full matrix are next. Expect APIs and results to change without notice. Contributions and experiments are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## What is homomorphic compression?
 
@@ -33,8 +33,8 @@ Familiar techniques already sit on this spectrum, even if they are rarely named 
 
 | Technique | Compressed-domain op | Trade-off |
 |---|---|---|
-| Scalar / int8 quantization | Approximate dot product | Small loss, ~4x smaller |
-| Binary / 1-bit quantization | Hamming distance as a proxy | Large loss, ~32x smaller |
+| Scalar / int8 quantization (`int8` in hvec) | Approximate dot product | Small loss, ~4x smaller |
+| Binary / 1-bit quantization (`binary` in hvec) | Sign agreement as a proxy | Large loss, ~32x smaller |
 | Product quantization (PQ) with asymmetric distance | Table-lookup distance | Tunable loss, 8-64x smaller |
 | Random projections / JL sketches | Approximate inner product | Provable error bounds |
 | Homomorphic encryption (CKKS and friends) | Exact ops on ciphertext | Privacy, heavy compute |
@@ -243,12 +243,49 @@ metric, chat profile and the model id the provider actually served, plus timings
 retrieve and generate, token counts, the retrieved chunk ids and scores, the prompt version, the
 question and the answer. This table is the raw material for the benchmark matrix.
 
-### Comparing codecs
+### 6. Measure codecs without a chat model
 
-Only the `f32` baseline exists today. The intended workflow once more codecs land is to ingest the
-same corpus into one collection per codec, run the same question set against each with the same
-chat model, and compare the run log rows. The `bench` and `report` subcommands will automate that.
-The phases are laid out in [ROADMAP.md](ROADMAP.md).
+```sh
+hvec bench recall --collection handbook                      # int8 and binary vs f32
+hvec bench recall --collection handbook --codecs binary -k 20 --sample 500
+hvec bench recall --collection handbook --queries questions.txt --json
+```
+
+`bench recall` takes an f32 collection as ground truth, re-encodes every vector with each codec,
+and ranks a set of queries both ways. It reports recall@k against the exact ranking, top-1
+agreement, mean and maximum score error, bytes per vector, compression ratio, and encode and scan
+time. Queries are stored vectors by default, each excluding itself, or lines from a file embedded
+with the collection's own embedder. Every codec's result is a `recall` row in the run log.
+
+Measured on this repository's own docs (123 chunks, `bge-small-en-v1.5`, 384 dims, cosine, 60
+self-queries, k=10):
+
+```
+codec     recall@k    top1   mean err    max err    bytes   ratio encode ms  scan ms
+f32         1.0000   1.000    0.00000    0.00000     1536    1.0x         2      120
+int8        0.9917   0.950    0.00047    0.00271      392    3.9x         0        0
+binary      0.7117   0.683    0.34626    0.45371       48   32.0x         0        0
+```
+
+Two things to read off this. int8 is close to free: 3.9× smaller, recall within a percent, score
+error below a thousandth. Binary loses a third of the neighbours on this embedding model, and its
+scores are far from the exact cosine because BGE vectors are not centred, so sign bits discard a
+lot. Whether that loss reaches the answer is the phase 3 question. The f32 scan is slow only
+because the baseline decodes each vector; the other codecs score the bytes directly.
+
+### Comparing codecs end to end
+
+Ingest the same corpus into one collection per codec, then run the same questions against each:
+
+```sh
+hvec ingest docs/ --collection hb-f32
+hvec ingest docs/ --collection hb-int8   --codec int8
+hvec ingest docs/ --collection hb-binary --codec binary
+hvec query "What is our refund policy?" --collection hb-binary --chat ollama
+```
+
+Each run records its codec, so the run log already holds the comparison. A `bench run` over a
+question set and a `report` that groups the log are the next phase; see [ROADMAP.md](ROADMAP.md).
 
 ### Is this overkill?
 

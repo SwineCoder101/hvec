@@ -270,3 +270,129 @@ fn mixing_embedders_in_a_collection_is_refused() {
     assert!(!out.status.success());
     assert!(stderr(&out).contains("refusing to mix"), "{}", stderr(&out));
 }
+
+#[test]
+fn bench_recall_measures_codecs_against_f32_and_records_runs() {
+    let env = Env::new();
+    // A few more documents so top-k is meaningful.
+    for i in 0..6 {
+        env.write_doc(
+            &format!("extra{i}.md"),
+            &format!("Topic {i}: notes about subject number {i} and its details, item {i}."),
+        );
+    }
+    let dir = env.dir.path().to_str().unwrap().to_owned();
+    env.write_doc("refunds.md", REFUNDS);
+    env.write_doc("shipping.md", SHIPPING);
+    assert_ok(&env.run(&["ingest", &dir, "--collection", "docs"]), "ingest dir");
+
+    let out = env.run(&[
+        "bench",
+        "recall",
+        "--collection",
+        "docs",
+        "--codecs",
+        "int8,binary",
+        "-k",
+        "3",
+        "--sample",
+        "4",
+        "--json",
+    ]);
+    assert_ok(&out, "bench recall");
+    let reports: Vec<serde_json::Value> = serde_json::from_str(&stdout(&out)).expect("json reports");
+    let names: Vec<&str> = reports.iter().map(|r| r["codec"].as_str().unwrap()).collect();
+    assert_eq!(names, ["f32", "int8", "binary"]);
+    assert_eq!(reports[0]["recall_at_k"], 1.0);
+    assert_eq!(reports[0]["mean_abs_score_error"], 0.0);
+    assert_eq!(reports[0]["queries"], 4);
+    assert_eq!(reports[0]["vectors"], 8);
+    assert!(
+        reports[1]["recall_at_k"].as_f64().unwrap() >= 0.5,
+        "int8: {}",
+        reports[1]
+    );
+    assert_eq!(reports[1]["bytes_per_vector"], 136);
+    assert_eq!(reports[2]["bytes_per_vector"], 16);
+    assert_eq!(reports[2]["compression_ratio"], 32.0);
+
+    let list = env.run(&["runs", "list"]);
+    assert_eq!(count_runs(&stdout(&list), "recall"), 3, "{}", stdout(&list));
+
+    // A query file is embedded with the collection's embedder.
+    let qf = env.write_doc("queries.txt", "refund window\nshipping time\n");
+    let out = env.run(&[
+        "bench",
+        "recall",
+        "--collection",
+        "docs",
+        "--queries",
+        qf.to_str().unwrap(),
+        "--no-record",
+        "--json",
+    ]);
+    assert_ok(&out, "bench recall with query file");
+    let reports: Vec<serde_json::Value> = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(reports[0]["queries"], 2);
+    assert_eq!(
+        count_runs(&stdout(&env.run(&["runs", "list"])), "recall"),
+        3,
+        "--no-record must not add runs"
+    );
+}
+
+#[test]
+fn bench_recall_refuses_non_f32_collection() {
+    let env = Env::new();
+    let a = env.write_doc("a.md", REFUNDS);
+    assert_ok(
+        &env.run(&["ingest", a.to_str().unwrap(), "--collection", "d8", "--codec", "int8"]),
+        "ingest int8",
+    );
+    let out = env.run(&["bench", "recall", "--collection", "d8"]);
+    assert!(!out.status.success());
+    assert!(stderr(&out).contains("needs an f32 collection"), "{}", stderr(&out));
+}
+
+#[test]
+fn query_against_int8_and_binary_collections_records_the_codec() {
+    let env = Env::new();
+    let a = env.write_doc("refunds.md", REFUNDS);
+    let b = env.write_doc("shipping.md", SHIPPING);
+    for codec in ["int8", "binary"] {
+        let col = format!("docs-{codec}");
+        assert_ok(
+            &env.run(&[
+                "ingest",
+                a.to_str().unwrap(),
+                b.to_str().unwrap(),
+                "--collection",
+                &col,
+                "--codec",
+                codec,
+            ]),
+            "ingest",
+        );
+        let out = env.run(&[
+            "query",
+            "what is the refund window?",
+            "--collection",
+            &col,
+            "-k",
+            "1",
+            "--json",
+        ]);
+        assert_ok(&out, "query");
+        let row: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+        assert_eq!(row["codec"], codec);
+        assert!(
+            row["metrics"]["retrieved"][0]["source"]
+                .as_str()
+                .unwrap()
+                .ends_with("refunds.md"),
+            "{codec}: {row}"
+        );
+    }
+    let list = stdout(&env.run(&["collections", "list"]));
+    assert!(list.contains("int8") && list.contains("binary"), "{list}");
+}
