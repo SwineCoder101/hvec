@@ -1,6 +1,6 @@
 ---
 title: "SciFact: int8 and binary codecs against f32, two embedding models"
-date: 2026-10-08 20:30:00 +0000
+date: 2026-10-08 18:00:00 +0000
 result: "int8 keeps recall@10 at 0.99 at 3.9× smaller; binary keeps 0.61 (bge-small) and 0.71 (MiniLM) at 32× smaller, and widening k does not recover it."
 references: [jegou2011pq, charikar2002simhash, gong2013itq, xiao2023bge, thakur2021beir, gao2024rabitq]
 ---
