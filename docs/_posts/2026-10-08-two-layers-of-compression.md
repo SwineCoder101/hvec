@@ -1,6 +1,6 @@
 ---
 title: "Two layers of compression, and which one the agent never sees"
-date: 2026-10-09
+date: 2026-10-08 18:00:00 +0100
 excerpt: "An embedding is already a lossy codec. hvec adds a second one. Here is what each layer compresses, how they interact, and why the agent reads text, not codes."
 references: [morris2023vec2text, jegou2011pq, kusupati2022mrl, guo2020scann, lewis2020rag, jiang2023llmlingua]
 ---
