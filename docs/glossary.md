@@ -55,7 +55,15 @@ the tool. Papers are linked by key into the [references]({{ "/references/" | rel
 : Short for coder-decoder: a pair of functions that compress a vector to bytes and reconstruct it.
   In hvec a codec is the `Codec` trait: `encode`, `decode`, and crucially `score`, which computes
   the metric directly on the compressed bytes. Every collection is stored through one codec and
-  records its name (`f32`, later `int8`, `binary`, `pq`).
+  records its name (`f32`, `int8`, `binary`, `binary-centred`, later `pq`).
+
+**Trained codec**, **stateless codec**
+: A stateless codec encodes each vector on its own: `f32`, `int8` and `binary`. A trained codec
+  first learns statistics from the corpus (a mean, a codebook) and encodes relative to them:
+  `binary-centred`, and PQ when it arrives. In hvec a trained codec is fitted on the first ingest
+  into a collection and its parameters are stored with the collection, so later ingests and every
+  query use the same ones. The parameters are stored once, not per vector, so they do not count
+  towards the compression ratio.
 
 **Embedding as compression**
 : An embedding model is itself a lossy codec: it keeps one operation, semantic similarity, and
@@ -104,6 +112,14 @@ the tool. Papers are linked by key into the [references]({{ "/references/" | rel
   [charikar2002simhash]({{ "/references/#charikar2002simhash" | relative_url }}). Large error on its own, often used as a first pass
   before re-ranking. [gao2024rabitq]({{ "/references/#gao2024rabitq" | relative_url }}) gives a version with error bounds.
 
+**Mean-centred binary**, **centring**
+: Subtracting the corpus mean from every vector before taking sign bits. Embedding models often
+  emit vectors with a strong shared component, so many dimensions have the same sign across the
+  whole corpus and their bits discriminate nothing; centring spends every bit on how a vector
+  differs from the rest. It is the first step of [gong2013itq]({{ "/references/#gong2013itq" | relative_url }}) and of most
+  practical binary schemes. In hvec it is the `binary-centred` codec, and the SciFact experiments
+  measure what it recovers.
+
 **Product quantization (PQ)**
 : Split the vector into `m` sub-vectors, cluster each subspace into 256 centroids with k-means, and
   store one byte per sub-vector. Distances come from `m` table lookups. 8× to 64× compression with
@@ -123,7 +139,7 @@ the tool. Papers are linked by key into the [references]({{ "/references/" | rel
 
 **Compression ratio**
 : Bytes of the uncompressed f32 vector divided by bytes of the encoded one. The `Codec` trait
-  reports it; f32 is 1.0, int8 about 4, binary 32.
+  reports it; f32 is 1.0, int8 about 4, binary and binary-centred 32.
 
 **Homomorphic encryption (HE, FHE)**, **CKKS**, **ciphertext**
 : Encryption schemes where arithmetic on ciphertext corresponds to arithmetic on the plaintext.

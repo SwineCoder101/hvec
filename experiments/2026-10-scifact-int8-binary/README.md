@@ -84,3 +84,6 @@ involved, so nothing here says whether the answers change.
 **Next.** Centre the vectors (subtract the corpus mean) before binarising, which is the standard
 fix for the BGE effect, and add it as a codec option. Then run this corpus through `bench run`
 with a question set and two chat models to see whether 0.61 recall reaches the answer.
+
+*Follow-up:* the centring step is measured in
+[SciFact, mean-centred binary](../2026-10-scifact-centred-binary/).

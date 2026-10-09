@@ -75,7 +75,7 @@ async fn run_cmd(config: &Option<PathBuf>, args: BenchRunArgs) -> Result<()> {
     let mut done = 0usize;
     let mut failures = 0usize;
     for collection in &collections {
-        let codec = codec_by_name(&collection.codec, collection.dimension)?;
+        let codec = collection.codec()?;
         let embedder = Arc::clone(&embedders[&collection.embed_profile]);
         for (chat_name, chat) in chat_names.iter().zip(&chats) {
             let pipeline = Pipeline {
@@ -191,7 +191,7 @@ pub fn report(config: &Option<PathBuf>, args: &ReportArgs) -> Result<()> {
 fn print_cells(cells: &[Cell]) {
     let mut rerouted = 0usize;
     println!(
-        "{:<12} {:<18} {:<26} {:<8} {:<24} {:>4} {:>6} {:>8} {:>7} {:>7} {:>7} {:>6} {:>6} {:>4}",
+        "{:<12} {:<18} {:<26} {:<15} {:<24} {:>4} {:>6} {:>8} {:>7} {:>7} {:>7} {:>6} {:>6} {:>4}",
         "set",
         "collection",
         "embed model",
@@ -210,7 +210,7 @@ fn print_cells(cells: &[Cell]) {
     for c in cells {
         let embed = c.key.embed_model.rsplit('/').next().unwrap_or(&c.key.embed_model);
         println!(
-            "{:<12} {:<18} {:<26} {:<8} {:<24} {:>4} {:>6.3} {:>8.3} {:>7} {:>7.0} {:>7.0} {:>6.0} {:>6.0} {:>4}",
+            "{:<12} {:<18} {:<26} {:<15} {:<24} {:>4} {:>6.3} {:>8.3} {:>7} {:>7.0} {:>7.0} {:>6.0} {:>6.0} {:>4}",
             trunc(&c.key.question_set, 12),
             trunc(&c.key.collection, 18),
             trunc(embed, 26),
@@ -305,7 +305,13 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
 
     let mut reports: Vec<RecallReport> = Vec::new();
     for name in &names {
-        let codec = codec_by_name(name, collection.dimension)?;
+        let mut codec = codec_by_name(name, collection.dimension)?;
+        // Trained codecs learn their statistics from the collection itself,
+        // exactly as `ingest --codec` would.
+        let fitted = codec.needs_fit();
+        if fitted {
+            codec.fit(&vectors)?;
+        }
         let report = recall::evaluate(&ids, &vectors, &queries, codec.as_ref(), collection.metric, args.k)?;
         if !args.no_record {
             let mut row = RunRow::new("recall");
@@ -318,6 +324,7 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
                 "dimension": collection.dimension,
                 "queries": query_source,
                 "k": args.k,
+                "fitted_on_collection": fitted,
             });
             row.metrics = serde_json::to_value(&report)?;
             store.insert_run(&row)?;
@@ -341,12 +348,12 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
     println!("queries: {query_source}");
     println!();
     println!(
-        "{:<8} {:>9} {:>7} {:>10} {:>10} {:>8} {:>7} {:>9} {:>8}",
+        "{:<15} {:>9} {:>7} {:>10} {:>10} {:>8} {:>7} {:>9} {:>8}",
         "codec", "recall@k", "top1", "mean err", "max err", "bytes", "ratio", "encode ms", "scan ms"
     );
     for r in &reports {
         println!(
-            "{:<8} {:>9.4} {:>7.3} {:>10.5} {:>10.5} {:>8} {:>6.1}x {:>9} {:>8}",
+            "{:<15} {:>9.4} {:>7.3} {:>10.5} {:>10.5} {:>8} {:>6.1}x {:>9} {:>8}",
             r.codec,
             r.recall_at_k,
             r.top1_agreement,

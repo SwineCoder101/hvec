@@ -36,6 +36,7 @@ Familiar techniques already sit on this spectrum, even if they are rarely named 
 |---|---|---|
 | Scalar / int8 quantization (`int8` in hvec) | Approximate dot product | Small loss, ~4x smaller |
 | Binary / 1-bit quantization (`binary` in hvec) | Sign agreement as a proxy | Large loss, ~32x smaller |
+| Mean-centred binary (`binary-centred` in hvec) | Sign agreement after subtracting the corpus mean | Same size as binary; the loss depends on how centred the model's vectors are |
 | Product quantization (PQ) with asymmetric distance | Table-lookup distance | Tunable loss, 8-64x smaller |
 | Random projections / JL sketches | Approximate inner product | Provable error bounds |
 | Homomorphic encryption (CKKS and friends) | Exact ops on ciphertext | Privacy, heavy compute |
@@ -247,7 +248,7 @@ question and the answer. This table is the raw material for the benchmark matrix
 ### 6. Measure codecs without a chat model
 
 ```sh
-hvec bench recall --collection handbook                      # int8 and binary vs f32
+hvec bench recall --collection handbook                      # int8, binary and binary-centred vs f32
 hvec bench recall --collection handbook --codecs binary -k 20 --sample 500
 hvec bench recall --collection handbook --queries questions.txt --json
 ```
@@ -258,21 +259,33 @@ agreement, mean and maximum score error, bytes per vector, compression ratio, an
 time. Queries are stored vectors by default, each excluding itself, or lines from a file embedded
 with the collection's own embedder. Every codec's result is a `recall` row in the run log.
 
-Measured on this repository's own docs (123 chunks, `bge-small-en-v1.5`, 384 dims, cosine, 60
-self-queries, k=10):
+Codecs come in two kinds. `f32`, `int8` and `binary` are stateless: a vector encodes the same way
+regardless of its neighbours. `binary-centred` is *trained*: it subtracts the corpus mean before
+taking sign bits, so it has to see the corpus first. `bench recall` fits it on the collection it
+is measuring. `ingest --codec binary-centred` fits it on the first ingest into a collection,
+stores the mean alongside the collection, and reuses it for every later ingest, so make the first
+call a representative sample of the corpus rather than a single file.
+
+Measured on BEIR SciFact (8,036 chunks, `bge-small-en-v1.5`, 384 dims, cosine, the 300 test
+claims as queries, k=10, release build):
 
 ```
-codec     recall@k    top1   mean err    max err    bytes   ratio encode ms  scan ms
-f32         1.0000   1.000    0.00000    0.00000     1536    1.0x         2      120
-int8        0.9917   0.950    0.00047    0.00271      392    3.9x         0        0
-binary      0.7117   0.683    0.34626    0.45371       48   32.0x         0        0
+codec            recall@k    top1   mean err    max err    bytes   ratio encode ms  scan ms
+f32                1.0000   1.000    0.00000    0.00000     1536    1.0x         1     1203
+int8               0.9870   0.997    0.00049    0.00340      392    3.9x         2      538
+binary             0.6110   0.700    0.30665    0.45795       48   32.0x        10      310
+binary-centred     0.6560   0.727    0.04821    0.28495       48   32.0x        11      600
 ```
 
-Two things to read off this. int8 is close to free: 3.9× smaller, recall within a percent, score
-error below a thousandth. Binary loses a third of the neighbours on this embedding model, and its
-scores are far from the exact cosine because BGE vectors are not centred, so sign bits discard a
-lot. Whether that loss reaches the answer is the phase 3 question. The f32 scan is slow only
-because the baseline decodes each vector; the other codecs score the bytes directly.
+Three things to read off this. int8 is close to free: 3.9× smaller, recall within two percent,
+score error below a thousandth. Binary loses four neighbours in ten on this embedding model, and
+its scores are far from the exact cosine because BGE vectors share a large common component, so
+most sign bits agree across the corpus. Centring fixes the scores (six times smaller error) but
+recovers only four or five points of recall: one bit per dimension cannot separate neighbours
+whose cosines differ by less than its resolution, whatever the origin is. Whether that loss
+reaches the answer is the phase 3 question. The f32 scan is slow only because the baseline
+decodes each vector; the other codecs score the bytes directly. Both experiments are written up
+under [`experiments/`](experiments/).
 
 ### 7. Run the matrix and report
 

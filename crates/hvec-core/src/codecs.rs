@@ -287,6 +287,231 @@ impl Codec for BinaryCodec {
     }
 }
 
+// ---------------------------------------------------------------------------
+// mean-centred binary quantization
+// ---------------------------------------------------------------------------
+
+/// Sign bits of the mean-centred vector: `sign(x − μ)`, with `μ` the corpus
+/// mean learned by [`Codec::fit`]. Same 32× size as [`BinaryCodec`].
+///
+/// Embedding models often emit vectors with a strong shared component: many
+/// dimensions have the same sign across the whole corpus and their sign bits
+/// discriminate nothing. Subtracting the mean first spends every bit on how a
+/// vector differs from the rest of the corpus.
+///
+/// Layout: identical to `binary`, `ceil(d / 8)` bytes per vector. The
+/// parameters, `μ` as `d` little-endian f32 followed by one f32 scale `α`, are
+/// stored once per collection through [`Codec::params`]. `α` is the mean
+/// `|x_i − μ_i|` over the fitting sample, the L1-optimal magnitude for a sign
+/// vector, so the decoded vector is `μ + α·s` with `s ∈ {−1, +1}^d`.
+///
+/// Error model: approximate. `score` computes the metric between the query
+/// and `μ + α·s` in one pass over the query, `μ` and the bits, without
+/// materialising the decoded vector. Ranking quality depends on how much of
+/// the corpus variance lies off the mean direction; see the SciFact
+/// experiments for measurements.
+#[derive(Debug, Clone)]
+pub struct BinaryCentredCodec {
+    dimension: usize,
+    fitted: Option<Centring>,
+}
+
+#[derive(Debug, Clone)]
+struct Centring {
+    mean: Vec<f32>,
+    scale: f32,
+    /// `‖μ‖²`, cached for the norm of the decoded vector.
+    mean_norm_sq: f64,
+}
+
+impl BinaryCentredCodec {
+    /// An unfitted instance. Call [`Codec::fit`] before encoding or scoring.
+    #[must_use]
+    pub fn new(dimension: usize) -> Self {
+        Self {
+            dimension,
+            fitted: None,
+        }
+    }
+
+    /// Restore an instance from the bytes [`Codec::params`] produced.
+    pub fn from_params(dimension: usize, params: &[u8]) -> Result<Self, CodecError> {
+        let expected = (dimension + 1) * 4;
+        if params.len() != expected {
+            return Err(CodecError::BadParams {
+                codec: "binary-centred".to_owned(),
+                reason: format!("expected {expected} bytes for {dimension} dims, got {}", params.len()),
+            });
+        }
+        let mut floats = params
+            .chunks_exact(4)
+            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]));
+        let mean: Vec<f32> = floats.by_ref().take(dimension).collect();
+        let scale = floats.next().unwrap_or(0.0);
+        if mean.iter().chain(std::iter::once(&scale)).any(|v| !v.is_finite()) {
+            return Err(CodecError::BadParams {
+                codec: "binary-centred".to_owned(),
+                reason: "non-finite value in parameters".to_owned(),
+            });
+        }
+        Ok(Self {
+            dimension,
+            fitted: Some(Centring::new(mean, scale)),
+        })
+    }
+
+    /// The fitted mean, if any.
+    #[must_use]
+    pub fn mean(&self) -> Option<&[f32]> {
+        self.fitted.as_ref().map(|c| c.mean.as_slice())
+    }
+
+    /// The fitted scale `α`, if any.
+    #[must_use]
+    pub fn scale(&self) -> Option<f32> {
+        self.fitted.as_ref().map(|c| c.scale)
+    }
+
+    fn centring(&self) -> Result<&Centring, CodecError> {
+        self.fitted
+            .as_ref()
+            .ok_or_else(|| CodecError::NotFitted("binary-centred".to_owned()))
+    }
+}
+
+impl Centring {
+    fn new(mean: Vec<f32>, scale: f32) -> Self {
+        let mean_norm_sq = mean.iter().map(|&m| f64::from(m) * f64::from(m)).sum();
+        Self {
+            mean,
+            scale,
+            mean_norm_sq,
+        }
+    }
+}
+
+impl Codec for BinaryCentredCodec {
+    fn name(&self) -> &'static str {
+        "binary-centred"
+    }
+
+    fn dimension(&self) -> usize {
+        self.dimension
+    }
+
+    fn encoded_size(&self) -> usize {
+        self.dimension.div_ceil(8)
+    }
+
+    fn supported_metrics(&self) -> &'static [Metric] {
+        &[Metric::Dot, Metric::Cosine, Metric::L2]
+    }
+
+    fn needs_fit(&self) -> bool {
+        self.fitted.is_none()
+    }
+
+    fn fit(&mut self, sample: &[Vector]) -> Result<(), CodecError> {
+        if sample.is_empty() {
+            return Err(CodecError::EmptySample {
+                codec: "binary-centred".to_owned(),
+            });
+        }
+        let mut sums = vec![0f64; self.dimension];
+        for v in sample {
+            check_dim(self.dimension, v.len())?;
+            for (s, &x) in sums.iter_mut().zip(v) {
+                *s += f64::from(x);
+            }
+        }
+        let n = sample.len() as f64;
+        let mean: Vec<f32> = sums.iter().map(|s| (s / n) as f32).collect();
+        let mut abs_dev = 0f64;
+        for v in sample {
+            for (&x, &m) in v.iter().zip(&mean) {
+                abs_dev += f64::from((x - m).abs());
+            }
+        }
+        let scale = (abs_dev / (n * self.dimension as f64)) as f32;
+        self.fitted = Some(Centring::new(mean, scale));
+        Ok(())
+    }
+
+    fn params(&self) -> Vec<u8> {
+        match &self.fitted {
+            None => Vec::new(),
+            Some(c) => c
+                .mean
+                .iter()
+                .chain(std::iter::once(&c.scale))
+                .flat_map(|v| v.to_le_bytes())
+                .collect(),
+        }
+    }
+
+    fn encode(&self, vector: &[f32]) -> Result<Encoded, CodecError> {
+        check_dim(self.dimension, vector.len())?;
+        let c = self.centring()?;
+        let mut out = vec![0u8; self.encoded_size()];
+        for (i, (&x, &m)) in vector.iter().zip(&c.mean).enumerate() {
+            if x > m {
+                out[i / 8] |= 1 << (i % 8);
+            }
+        }
+        Ok(Encoded(out))
+    }
+
+    fn decode(&self, encoded: &Encoded) -> Result<Vector, CodecError> {
+        check_payload(self.encoded_size(), encoded.0.len())?;
+        let c = self.centring()?;
+        Ok(c.mean
+            .iter()
+            .enumerate()
+            .map(|(i, &m)| {
+                if encoded.0[i / 8] >> (i % 8) & 1 == 1 {
+                    m + c.scale
+                } else {
+                    m - c.scale
+                }
+            })
+            .collect())
+    }
+
+    fn score(&self, query: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
+        check_dim(self.dimension, query.len())?;
+        check_payload(self.encoded_size(), encoded.0.len())?;
+        let c = self.centring()?;
+        let alpha = f64::from(c.scale);
+        // Running sums over one pass: q·μ, q·s, μ·s and ‖q‖², with s = ±1.
+        let (mut dot_qm, mut dot_qs, mut dot_ms, mut sum_qq) = (0f64, 0f64, 0f64, 0f64);
+        for (i, (&q, &m)) in query.iter().zip(&c.mean).enumerate() {
+            let (q, m) = (f64::from(q), f64::from(m));
+            let positive = encoded.0[i / 8] >> (i % 8) & 1 == 1;
+            dot_qm += q * m;
+            sum_qq += q * q;
+            if positive {
+                dot_qs += q;
+                dot_ms += m;
+            } else {
+                dot_qs -= q;
+                dot_ms -= m;
+            }
+        }
+        // decoded = μ + α·s
+        let dot = dot_qm + alpha * dot_qs;
+        let stored_norm_sq = c.mean_norm_sq + 2.0 * alpha * dot_ms + alpha * alpha * self.dimension as f64;
+        let v = match metric {
+            Metric::Dot => dot,
+            Metric::Cosine => {
+                let denom = (sum_qq * stored_norm_sq).sqrt();
+                if denom == 0.0 { 0.0 } else { dot / denom }
+            }
+            Metric::L2 => (sum_qq - 2.0 * dot + stored_norm_sq).max(0.0),
+        };
+        Ok(v as f32)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306,11 +531,20 @@ mod tests {
         }
     }
 
+    fn fitted_centred(dim: usize, sample: &[Vec<f32>]) -> BinaryCentredCodec {
+        let mut c = BinaryCentredCodec::new(dim);
+        c.fit(sample).unwrap();
+        c
+    }
+
     fn all_codecs(dim: usize) -> Vec<Box<dyn Codec>> {
+        let mut rng = XorShift(0xC0FF_EE00 + dim as u64);
+        let sample: Vec<Vec<f32>> = (0..32).map(|_| rng.vector(dim)).collect();
         vec![
             Box::new(F32Codec::new(dim)),
             Box::new(Int8Codec::new(dim)),
             Box::new(BinaryCodec::new(dim)),
+            Box::new(fitted_centred(dim, &sample)),
         ]
     }
 
@@ -459,10 +693,129 @@ mod tests {
     }
 
     #[test]
-    fn codec_by_name_knows_all_three() {
+    fn centred_binary_must_be_fitted_first() {
+        let mut codec = BinaryCentredCodec::new(8);
+        assert!(codec.needs_fit());
+        assert!(codec.params().is_empty());
+        assert!(matches!(codec.encode(&[1.0; 8]), Err(CodecError::NotFitted(_))));
+        assert!(matches!(
+            codec.score(&[1.0; 8], &Encoded(vec![0]), Metric::Dot),
+            Err(CodecError::NotFitted(_))
+        ));
+        assert!(matches!(codec.fit(&[]), Err(CodecError::EmptySample { .. })));
+        assert!(matches!(
+            codec.fit(&[vec![1.0; 7]]),
+            Err(CodecError::DimensionMismatch { expected: 8, got: 7 })
+        ));
+        codec.fit(&[vec![1.0; 8], vec![3.0; 8]]).unwrap();
+        assert!(!codec.needs_fit());
+        assert_eq!(codec.mean().unwrap(), &[2.0; 8]);
+        assert_eq!(codec.scale(), Some(1.0));
+        // Stateless codecs accept fit as a no-op.
+        let mut plain = BinaryCodec::new(8);
+        assert!(!plain.needs_fit());
+        plain.fit(&[]).unwrap();
+        assert!(plain.params().is_empty());
+    }
+
+    #[test]
+    fn centred_binary_params_roundtrip_through_the_registry() {
+        let mut rng = XorShift(7);
+        let dim = 40;
+        let sample: Vec<Vec<f32>> = (0..50).map(|_| rng.vector(dim)).collect();
+        let fitted = fitted_centred(dim, &sample);
+        let params = fitted.params();
+        assert_eq!(params.len(), (dim + 1) * 4);
+
+        let restored = crate::codec_with_params("binary-centred", dim, &params).unwrap();
+        assert!(!restored.needs_fit());
+        assert_eq!(restored.params(), params);
+        let v = rng.vector(dim);
+        assert_eq!(restored.encode(&v).unwrap(), fitted.encode(&v).unwrap());
+        let q = rng.vector(dim);
+        let enc = fitted.encode(&v).unwrap();
+        assert_eq!(
+            restored.score(&q, &enc, Metric::Cosine).unwrap(),
+            fitted.score(&q, &enc, Metric::Cosine).unwrap()
+        );
+
+        assert!(matches!(
+            BinaryCentredCodec::from_params(dim, &params[..8]),
+            Err(CodecError::BadParams { .. })
+        ));
+        assert!(matches!(
+            crate::codec_with_params("binary-centred", dim, &[]),
+            Err(CodecError::BadParams { .. })
+        ));
+        assert!(matches!(
+            crate::codec_with_params("binary", dim, &params),
+            Err(CodecError::BadParams { .. })
+        ));
+        assert!(!crate::codec_with_params("int8", dim, &[]).unwrap().needs_fit());
+    }
+
+    #[test]
+    fn centring_recovers_ranking_that_plain_binary_cannot_see() {
+        // Every vector shares a large positive offset, so plain sign bits are
+        // all ones and carry no information. Centring removes the offset.
+        let mut rng = XorShift(2718);
+        let dim = 96;
+        let offset = vec![1.0f32; dim];
+        let centre_a: Vec<f32> = rng.vector(dim);
+        let centre_b: Vec<f32> = rng.vector(dim);
+        let make = |rng: &mut XorShift, c: &[f32]| -> Vec<f32> {
+            let mut v: Vec<f32> = offset
+                .iter()
+                .zip(c)
+                .map(|(o, x)| o + 0.3 * x + 0.1 * rng.next_f32())
+                .collect();
+            distance::normalize(&mut v);
+            v
+        };
+        let mut corpus: Vec<Vec<f32>> = Vec::new();
+        for _ in 0..30 {
+            corpus.push(make(&mut rng, &centre_a));
+            corpus.push(make(&mut rng, &centre_b));
+        }
+        let query = make(&mut rng, &centre_a);
+        let same = make(&mut rng, &centre_a);
+        let other = make(&mut rng, &centre_b);
+        assert!(
+            corpus.iter().flatten().all(|&x| x > 0.0),
+            "test data must be all-positive"
+        );
+
+        let plain = BinaryCodec::new(dim);
+        let p_same = plain
+            .score(&query, &plain.encode(&same).unwrap(), Metric::Cosine)
+            .unwrap();
+        let p_other = plain
+            .score(&query, &plain.encode(&other).unwrap(), Metric::Cosine)
+            .unwrap();
+        assert_eq!(p_same, p_other, "plain binary sees identical bit strings");
+
+        let centred = fitted_centred(dim, &corpus);
+        let c_same = centred
+            .score(&query, &centred.encode(&same).unwrap(), Metric::Cosine)
+            .unwrap();
+        let c_other = centred
+            .score(&query, &centred.encode(&other).unwrap(), Metric::Cosine)
+            .unwrap();
+        assert!(c_same > c_other, "{c_same} vs {c_other}");
+
+        // The exact cosine agrees on the ordering and the estimate is close.
+        let exact_same = distance::cosine(&query, &same);
+        let exact_other = distance::cosine(&query, &other);
+        assert!(exact_same > exact_other);
+        assert!((c_same - exact_same).abs() < 0.05, "{c_same} vs {exact_same}");
+    }
+
+    #[test]
+    fn codec_registry_knows_every_codec() {
         for name in crate::codec_names() {
             let c = crate::codec_by_name(name, 32).unwrap();
             assert_eq!(c.name(), *name);
+            assert_eq!(c.needs_fit(), *name == "binary-centred");
         }
         assert!(matches!(
             crate::codec_by_name("pq", 32),

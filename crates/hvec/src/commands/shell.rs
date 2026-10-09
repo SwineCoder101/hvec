@@ -12,7 +12,7 @@ use std::sync::Arc;
 use anyhow::{Context as _, Result, anyhow};
 use hvec_bench::QueryRecord;
 use hvec_connect::{ChatModel, ChatRequest, Embedder, Message, Role};
-use hvec_core::{Codec, codec_by_name};
+use hvec_core::Codec;
 use hvec_store::{Collection, Session, Store};
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, config::Configurer};
@@ -66,10 +66,7 @@ impl Shell {
                 if all.len() == 1 { Some(all.remove(0)) } else { None }
             }
         };
-        let codec = collection
-            .as_ref()
-            .map(|c| codec_by_name(&c.codec, c.dimension))
-            .transpose()?;
+        let codec = collection.as_ref().map(hvec_store::Collection::codec).transpose()?;
 
         let session_name = args
             .session
@@ -205,7 +202,7 @@ impl Shell {
                 }
                 Some(name) => {
                     let c = self.store.require_collection(name)?;
-                    self.codec = Some(codec_by_name(&c.codec, c.dimension)?);
+                    self.codec = Some(c.codec()?);
                     eprintln!("using collection `{}` ({} chunks)", c.name, c.chunk_count);
                     self.collection = Some(c);
                 }
@@ -306,7 +303,7 @@ impl Shell {
         let cfg = Some(self.ctx.config_path.clone());
         self.handle.block_on(crate::commands::ingest::run(&cfg, args))?;
         let c = self.store.require_collection(collection)?;
-        self.codec = Some(codec_by_name(&c.codec, c.dimension)?);
+        self.codec = Some(c.codec()?);
         self.collection = Some(c);
         Ok(())
     }

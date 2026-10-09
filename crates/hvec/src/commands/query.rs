@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use hvec_bench::QueryRecord;
-use hvec_core::codec_by_name;
 
 use crate::cli::QueryArgs;
 use crate::commands::rag;
@@ -16,7 +15,7 @@ pub async fn run(config: &Option<PathBuf>, args: QueryArgs) -> Result<()> {
 
     let embedder = hvec_connect::embedder(&ctx.config, &collection.embed_profile).await?;
     let chat = hvec_connect::chat_model(&ctx.config, &chat_name)?;
-    let codec = codec_by_name(&collection.codec, collection.dimension)?;
+    let codec = collection.codec()?;
 
     let pipeline = rag::Pipeline {
         store: &store,

@@ -292,7 +292,7 @@ fn bench_recall_measures_codecs_against_f32_and_records_runs() {
         "--collection",
         "docs",
         "--codecs",
-        "int8,binary",
+        "int8,binary,binary-centred",
         "-k",
         "3",
         "--sample",
@@ -302,7 +302,7 @@ fn bench_recall_measures_codecs_against_f32_and_records_runs() {
     assert_ok(&out, "bench recall");
     let reports: Vec<serde_json::Value> = serde_json::from_str(&stdout(&out)).expect("json reports");
     let names: Vec<&str> = reports.iter().map(|r| r["codec"].as_str().unwrap()).collect();
-    assert_eq!(names, ["f32", "int8", "binary"]);
+    assert_eq!(names, ["f32", "int8", "binary", "binary-centred"]);
     assert_eq!(reports[0]["recall_at_k"], 1.0);
     assert_eq!(reports[0]["mean_abs_score_error"], 0.0);
     assert_eq!(reports[0]["queries"], 4);
@@ -315,9 +315,13 @@ fn bench_recall_measures_codecs_against_f32_and_records_runs() {
     assert_eq!(reports[1]["bytes_per_vector"], 136);
     assert_eq!(reports[2]["bytes_per_vector"], 16);
     assert_eq!(reports[2]["compression_ratio"], 32.0);
+    // The trained codec is fitted on the collection and costs no extra bytes per vector.
+    assert_eq!(reports[3]["bytes_per_vector"], 16);
+    assert_eq!(reports[3]["compression_ratio"], 32.0);
+    assert!(reports[3]["recall_at_k"].as_f64().unwrap() > 0.0);
 
     let list = env.run(&["runs", "list"]);
-    assert_eq!(count_runs(&stdout(&list), "recall"), 3, "{}", stdout(&list));
+    assert_eq!(count_runs(&stdout(&list), "recall"), 4, "{}", stdout(&list));
 
     // A query file is embedded with the collection's embedder.
     let qf = env.write_doc("queries.txt", "refund window\nshipping time\n");
@@ -336,7 +340,7 @@ fn bench_recall_measures_codecs_against_f32_and_records_runs() {
     assert_eq!(reports[0]["queries"], 2);
     assert_eq!(
         count_runs(&stdout(&env.run(&["runs", "list"])), "recall"),
-        3,
+        4,
         "--no-record must not add runs"
     );
 }
@@ -395,6 +399,85 @@ fn query_against_int8_and_binary_collections_records_the_codec() {
     }
     let list = stdout(&env.run(&["collections", "list"]));
     assert!(list.contains("int8") && list.contains("binary"), "{list}");
+}
+
+#[test]
+fn binary_centred_collection_is_fitted_once_and_reused_on_append() {
+    let env = Env::new();
+    let a = env.write_doc("refunds.md", REFUNDS);
+    let b = env.write_doc("shipping.md", SHIPPING);
+    let c = env.write_doc(
+        "warranty.md",
+        "Warranty: every device is covered against manufacturing defects for two years from purchase.",
+    );
+    // The first ingest fits the mean on everything it sees.
+    let out = env.run(&[
+        "ingest",
+        a.to_str().unwrap(),
+        b.to_str().unwrap(),
+        "--collection",
+        "centred",
+        "--codec",
+        "binary-centred",
+    ]);
+    assert_ok(&out, "ingest fitted");
+    assert!(stdout(&out).contains("codec binary-centred"), "{}", stdout(&out));
+    assert!(stderr(&out).contains("fitted binary-centred on"), "{}", stderr(&out));
+    let list = stdout(&env.run(&["collections", "list"]));
+    assert!(list.contains("binary-centred"), "{list}");
+
+    // Appending reuses the stored parameters instead of refitting, so the
+    // vectors already stored stay comparable with the new ones.
+    let out = env.run(&[
+        "ingest",
+        c.to_str().unwrap(),
+        "--collection",
+        "centred",
+        "--codec",
+        "binary-centred",
+    ]);
+    assert_ok(&out, "ingest append");
+    assert!(!stderr(&out).contains("fitted binary-centred"), "{}", stderr(&out));
+    assert!(stdout(&out).contains("3 chunks total"), "{}", stdout(&out));
+
+    for (question, source) in [
+        ("what is the refund window?", "refunds.md"),
+        ("how long does shipping take?", "shipping.md"),
+        ("how long is the warranty?", "warranty.md"),
+    ] {
+        let out = env.run(&["query", question, "--collection", "centred", "-k", "1", "--json"]);
+        assert_ok(&out, "query");
+        let row: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+        assert_eq!(row["codec"], "binary-centred");
+        assert!(
+            row["metrics"]["retrieved"][0]["source"]
+                .as_str()
+                .unwrap()
+                .ends_with(source),
+            "{question}: {row}"
+        );
+    }
+
+    // A different codec into the same collection is refused.
+    let out = env.run(&[
+        "ingest",
+        a.to_str().unwrap(),
+        "--collection",
+        "centred",
+        "--codec",
+        "binary",
+    ]);
+    assert!(!out.status.success());
+    assert!(
+        stderr(&out).contains("stores binary-centred vectors"),
+        "{}",
+        stderr(&out)
+    );
+
+    // bench recall needs f32 ground truth, so a fitted collection is refused too.
+    let out = env.run(&["bench", "recall", "--collection", "centred"]);
+    assert!(!out.status.success());
+    assert!(stderr(&out).contains("needs an f32 collection"), "{}", stderr(&out));
 }
 
 #[test]

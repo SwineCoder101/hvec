@@ -9,7 +9,7 @@ Workspace, `Codec` trait with the f32 baseline, Anthropic / OpenAI-compatible / 
 connectors, SQLite store scored through the codec, run log, interactive shell, mock-server
 integration tests, CI.
 
-## Phase 2 · Codecs and retrieval-only measurement (in progress)
+## Phase 2 · Codecs and retrieval-only measurement (done)
 
 - [x] `int8` scalar codec (per-vector scale and offset) and `binary` sign codec, both with
   compressed-domain `score` and tests against the f32 reference on random vectors.
@@ -19,6 +19,10 @@ integration tests, CI.
 - [x] `hvec ingest --codec` and per-codec collections as the unit of comparison.
 - [x] Run it on a real embedding model and corpus and publish the first table:
   [SciFact, int8 and binary](experiments/2026-10-scifact-int8-binary/).
+- [x] Trained codecs: `fit` and `params` on the `Codec` trait, parameters stored per collection,
+  fitted on first ingest and by `bench recall`. First instance: `binary-centred`, sign bits of
+  the mean-centred vector. Measured in
+  [SciFact, mean-centred binary](experiments/2026-10-scifact-centred-binary/).
 
 Exit: a table of recall@10 and score error per codec for one embedding model, in the run log.
 

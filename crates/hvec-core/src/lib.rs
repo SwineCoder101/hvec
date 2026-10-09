@@ -73,6 +73,12 @@ pub enum CodecError {
     UnknownMetric(String),
     #[error("unknown codec: {0}")]
     UnknownCodec(String),
+    #[error("codec {0} must be fitted on sample vectors before use")]
+    NotFitted(String),
+    #[error("codec {codec} cannot be fitted on an empty sample")]
+    EmptySample { codec: String },
+    #[error("codec {codec} was given invalid parameters: {reason}")]
+    BadParams { codec: String, reason: String },
 }
 
 /// A compressed representation of a vector, as stored on disk.
@@ -112,20 +118,72 @@ pub trait Codec: Send + Sync + std::fmt::Debug {
     fn compression_ratio(&self) -> f32 {
         (self.dimension() * 4) as f32 / self.encoded_size() as f32
     }
+
+    /// Whether [`Codec::fit`] must run before this instance can encode or score.
+    ///
+    /// Stateless codecs return `false`. A trained codec returns `true` until it
+    /// has been fitted or restored from [`Codec::params`].
+    fn needs_fit(&self) -> bool {
+        false
+    }
+
+    /// Learn parameters from a sample of uncompressed vectors.
+    ///
+    /// Stateless codecs accept any sample and do nothing. Trained codecs
+    /// compute corpus statistics (a mean, a codebook) that are then fixed for
+    /// the life of the collection and persisted through [`Codec::params`].
+    fn fit(&mut self, sample: &[Vector]) -> Result<(), CodecError> {
+        let _ = sample;
+        Ok(())
+    }
+
+    /// Serialised learned parameters, empty for stateless codecs.
+    ///
+    /// Restored with [`codec_with_params`]. Stored once per collection, so the
+    /// bytes are not counted in [`Codec::encoded_size`].
+    fn params(&self) -> Vec<u8> {
+        Vec::new()
+    }
 }
 
-/// Instantiate a codec by its stable name.
+/// Instantiate a codec by its stable name, unfitted.
+///
+/// Trained codecs (see [`Codec::needs_fit`]) come back needing a [`Codec::fit`]
+/// call; use [`codec_with_params`] to restore one that was fitted earlier.
 pub fn codec_by_name(name: &str, dimension: usize) -> Result<Box<dyn Codec>, CodecError> {
     match name {
         "f32" => Ok(Box::new(codecs::F32Codec::new(dimension))),
         "int8" => Ok(Box::new(codecs::Int8Codec::new(dimension))),
         "binary" => Ok(Box::new(codecs::BinaryCodec::new(dimension))),
+        "binary-centred" => Ok(Box::new(codecs::BinaryCentredCodec::new(dimension))),
         other => Err(CodecError::UnknownCodec(other.to_owned())),
+    }
+}
+
+/// Instantiate a codec by name and restore the parameters it was fitted with.
+///
+/// `params` is what [`Codec::params`] returned on the fitted instance; empty
+/// for stateless codecs. Non-empty parameters for a stateless codec are an
+/// error, as is an empty blob for a codec that needs one.
+pub fn codec_with_params(name: &str, dimension: usize, params: &[u8]) -> Result<Box<dyn Codec>, CodecError> {
+    match name {
+        "binary-centred" => Ok(Box::new(codecs::BinaryCentredCodec::from_params(dimension, params)?)),
+        _ => {
+            let codec = codec_by_name(name, dimension)?;
+            if params.is_empty() {
+                Ok(codec)
+            } else {
+                Err(CodecError::BadParams {
+                    codec: name.to_owned(),
+                    reason: format!("{} bytes of parameters for a stateless codec", params.len()),
+                })
+            }
+        }
     }
 }
 
 /// Names of every codec this build knows about.
 #[must_use]
 pub fn codec_names() -> &'static [&'static str] {
-    &["f32", "int8", "binary"]
+    &["f32", "int8", "binary", "binary-centred"]
 }

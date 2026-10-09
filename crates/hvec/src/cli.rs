@@ -164,8 +164,8 @@ pub struct RecallArgs {
     /// An f32 collection to use as ground truth.
     #[arg(short, long)]
     pub collection: String,
-    /// Codecs to evaluate.
-    #[arg(long, value_delimiter = ',', default_value = "int8,binary")]
+    /// Codecs to evaluate. Trained codecs are fitted on the collection first.
+    #[arg(long, value_delimiter = ',', default_value = "int8,binary,binary-centred")]
     pub codecs: Vec<String>,
     /// Neighbours per query.
     #[arg(short, long, default_value_t = 10)]
@@ -195,7 +195,7 @@ pub struct IngestArgs {
     /// Embedding profile. Defaults to `default_embedder` in config.
     #[arg(short, long)]
     pub embedder: Option<String>,
-    /// Codec used to store vectors: f32, int8 or binary.
+    /// Codec used to store vectors: f32, int8, binary or binary-centred.
     #[arg(long, default_value = "f32")]
     pub codec: String,
     /// Words per chunk.

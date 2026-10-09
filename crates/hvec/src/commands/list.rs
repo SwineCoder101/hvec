@@ -32,12 +32,12 @@ pub fn collections(config: &Option<PathBuf>, cmd: CollectionsCommand) -> Result<
                 return Ok(());
             }
             println!(
-                "{:<20} {:>8} {:>5}  {:<8} {:<8} embedder",
+                "{:<20} {:>8} {:>5}  {:<15} {:<8} embedder",
                 "name", "chunks", "dims", "codec", "metric"
             );
             for c in cols {
                 println!(
-                    "{:<20} {:>8} {:>5}  {:<8} {:<8} {} ({})",
+                    "{:<20} {:>8} {:>5}  {:<15} {:<8} {} ({})",
                     c.name,
                     c.chunk_count,
                     c.dimension,

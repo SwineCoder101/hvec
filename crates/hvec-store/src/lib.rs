@@ -85,7 +85,23 @@ impl Store {
     fn init(conn: Connection) -> Result<Self> {
         conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;")?;
         conn.execute_batch(schema::DDL)?;
+        for (table, column, alter) in schema::MIGRATIONS {
+            if !Self::has_column(&conn, table, column)? {
+                conn.execute_batch(alter)?;
+            }
+        }
         Ok(Self { conn })
+    }
+
+    fn has_column(conn: &Connection, table: &str, column: &str) -> Result<bool> {
+        let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+        let names = stmt.query_map([], |row| row.get::<_, String>(1))?;
+        for name in names {
+            if name? == column {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub(crate) fn now() -> String {

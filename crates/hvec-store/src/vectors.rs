@@ -1,6 +1,6 @@
 //! Collections of encoded vectors and brute-force compressed-domain search.
 
-use hvec_core::{Codec, Encoded, Metric};
+use hvec_core::{Codec, CodecError, Encoded, Metric};
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +17,19 @@ pub struct Collection {
     pub metric: Metric,
     pub created_at: String,
     pub chunk_count: u64,
+    /// Learned codec parameters, empty for stateless codecs. Internal, so
+    /// not part of the JSON view of a collection.
+    #[serde(skip)]
+    pub codec_params: Vec<u8>,
+}
+
+impl Collection {
+    /// The codec this collection's vectors are stored through, with any
+    /// learned parameters restored. Every search and ingest into the
+    /// collection must go through this instance.
+    pub fn codec(&self) -> Result<Box<dyn Codec>, CodecError> {
+        hvec_core::codec_with_params(&self.codec, self.dimension, &self.codec_params)
+    }
 }
 
 /// What is needed to create a collection.
@@ -28,6 +41,8 @@ pub struct NewCollection<'a> {
     pub dimension: usize,
     pub codec: &'a str,
     pub metric: Metric,
+    /// What the codec's `params()` returned after fitting; empty when stateless.
+    pub codec_params: &'a [u8],
 }
 
 /// A chunk ready to insert.
@@ -52,8 +67,8 @@ pub struct Hit {
 impl Store {
     pub fn create_collection(&self, new: &NewCollection<'_>) -> Result<()> {
         let inserted = self.conn.execute(
-            "INSERT OR IGNORE INTO collections (name, embed_profile, embed_model, dimension, codec, metric, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT OR IGNORE INTO collections (name, embed_profile, embed_model, dimension, codec, metric, created_at, codec_params)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 new.name,
                 new.embed_profile,
@@ -61,7 +76,8 @@ impl Store {
                 new.dimension as i64,
                 new.codec,
                 new.metric.name(),
-                Self::now()
+                Self::now(),
+                if new.codec_params.is_empty() { None } else { Some(new.codec_params) }
             ],
         )?;
         if inserted == 0 {
@@ -74,7 +90,7 @@ impl Store {
         self.conn
             .query_row(
                 "SELECT c.name, c.embed_profile, c.embed_model, c.dimension, c.codec, c.metric, c.created_at,
-                        (SELECT COUNT(*) FROM chunks WHERE collection = c.name)
+                        (SELECT COUNT(*) FROM chunks WHERE collection = c.name), c.codec_params
                  FROM collections c WHERE c.name = ?1",
                 params![name],
                 row_to_collection,
@@ -110,7 +126,7 @@ impl Store {
     pub fn list_collections(&self) -> Result<Vec<Collection>> {
         let mut stmt = self.conn.prepare(
             "SELECT c.name, c.embed_profile, c.embed_model, c.dimension, c.codec, c.metric, c.created_at,
-                    (SELECT COUNT(*) FROM chunks WHERE collection = c.name)
+                    (SELECT COUNT(*) FROM chunks WHERE collection = c.name), c.codec_params
              FROM collections c ORDER BY c.name",
         )?;
         let rows = stmt.query_map([], row_to_collection)?;
@@ -218,6 +234,7 @@ fn row_to_collection(row: &rusqlite::Row<'_>) -> rusqlite::Result<Collection> {
         metric,
         created_at: row.get(6)?,
         chunk_count: row.get::<_, i64>(7)? as u64,
+        codec_params: row.get::<_, Option<Vec<u8>>>(8)?.unwrap_or_default(),
     })
 }
 
@@ -225,6 +242,7 @@ fn row_to_collection(row: &rusqlite::Row<'_>) -> rusqlite::Result<Collection> {
 mod tests {
     use super::*;
     use hvec_core::codecs::F32Codec;
+    use rusqlite::Connection;
 
     fn store_with_collection() -> (Store, F32Codec) {
         let store = Store::open_in_memory().unwrap();
@@ -236,6 +254,7 @@ mod tests {
                 dimension: 2,
                 codec: "f32",
                 metric: Metric::Cosine,
+                codec_params: &[],
             })
             .unwrap();
         (store, F32Codec::new(2))
@@ -287,9 +306,80 @@ mod tests {
                 dimension: 2,
                 codec: "f32",
                 metric: Metric::Cosine,
+                codec_params: &[],
             })
             .unwrap_err();
         assert!(matches!(err, StoreError::EmbedderMismatch { .. }));
+    }
+
+    #[test]
+    fn codec_params_persist_and_restore_a_fitted_codec() {
+        let mut store = Store::open_in_memory().unwrap();
+        let mut fitted = hvec_core::codecs::BinaryCentredCodec::new(2);
+        fitted.fit(&[vec![1.0, 0.0], vec![0.0, 1.0]]).unwrap();
+        store
+            .create_collection(&NewCollection {
+                name: "bc",
+                embed_profile: "local",
+                embed_model: "test-model",
+                dimension: 2,
+                codec: fitted.name(),
+                metric: Metric::Cosine,
+                codec_params: &fitted.params(),
+            })
+            .unwrap();
+        let c = store.require_collection("bc").unwrap();
+        assert_eq!(c.codec_params, fitted.params());
+        let restored = c.codec().unwrap();
+        assert!(!restored.needs_fit());
+        assert_eq!(restored.name(), "binary-centred");
+
+        store
+            .insert_chunks(
+                "bc",
+                &[NewChunk {
+                    source: "a".into(),
+                    ordinal: 0,
+                    text: "east".into(),
+                    vector: restored.encode(&[1.0, 0.0]).unwrap(),
+                }],
+            )
+            .unwrap();
+        let hits = store
+            .search("bc", &[1.0, 0.0], 1, restored.as_ref(), Metric::Cosine)
+            .unwrap();
+        assert_eq!(hits[0].text, "east");
+
+        // Stateless collections carry no params and restore to the plain codec.
+        let (store2, _) = store_with_collection();
+        let plain = store2.require_collection("docs").unwrap();
+        assert!(plain.codec_params.is_empty());
+        assert_eq!(plain.codec().unwrap().name(), "f32");
+        let json = serde_json::to_value(&plain).unwrap();
+        assert!(json.get("codec_params").is_none());
+    }
+
+    #[test]
+    fn opening_a_pre_params_database_adds_the_column() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("old.db");
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE collections (
+                    name TEXT PRIMARY KEY, embed_profile TEXT NOT NULL, embed_model TEXT NOT NULL,
+                    dimension INTEGER NOT NULL, codec TEXT NOT NULL, metric TEXT NOT NULL, created_at TEXT NOT NULL);
+                 INSERT INTO collections VALUES ('old', 'local', 'm', 2, 'int8', 'cosine', '2026-01-01T00:00:00Z');",
+            )
+            .unwrap();
+        }
+        let store = Store::open(&path).unwrap();
+        let c = store.require_collection("old").unwrap();
+        assert!(c.codec_params.is_empty());
+        assert_eq!(c.codec().unwrap().name(), "int8");
+        // Reopening is idempotent.
+        drop(store);
+        Store::open(&path).unwrap();
     }
 
     #[test]

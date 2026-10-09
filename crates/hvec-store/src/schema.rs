@@ -1,4 +1,7 @@
 //! Schema. Idempotent so `Store::open` can run it every time.
+//!
+//! Columns added after the first release are listed in [`MIGRATIONS`] and
+//! applied when missing, so an older database file keeps working.
 
 pub(crate) const DDL: &str = r#"
 CREATE TABLE IF NOT EXISTS collections (
@@ -8,7 +11,8 @@ CREATE TABLE IF NOT EXISTS collections (
     dimension     INTEGER NOT NULL,
     codec         TEXT NOT NULL,
     metric        TEXT NOT NULL,
-    created_at    TEXT NOT NULL
+    created_at    TEXT NOT NULL,
+    codec_params  BLOB
 );
 
 CREATE TABLE IF NOT EXISTS chunks (
@@ -53,3 +57,10 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 CREATE INDEX IF NOT EXISTS runs_by_created ON runs(created_at);
 "#;
+
+/// `(table, column, ALTER TABLE statement)` for columns that older databases lack.
+pub(crate) const MIGRATIONS: &[(&str, &str, &str)] = &[(
+    "collections",
+    "codec_params",
+    "ALTER TABLE collections ADD COLUMN codec_params BLOB",
+)];
