@@ -52,6 +52,14 @@
   year: 2024
   url: https://arxiv.org/abs/2405.12497
   note: A binary quantizer with a provable error bound on estimated distances. A strong modern candidate for the 1-bit codec.
+- key: mu2018allbutthetop
+  topic: Quantization
+  authors: Jiaqi Mu, Pramod Viswanath
+  title: "All-but-the-Top: Simple and Effective Postprocessing for Word Representations"
+  venue: International Conference on Learning Representations (ICLR)
+  year: 2018
+  url: https://arxiv.org/abs/1702.01417
+  note: Shows that embedding vectors share a large common mean vector and a few dominant directions, and that subtracting them helps. The reason hvec's binary-centred codec exists.
 - key: gong2013itq
   topic: Quantization
   authors: Yunchao Gong, Svetlana Lazebnik, Albert Gordo, Florent Perronnin

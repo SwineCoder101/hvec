@@ -35,4 +35,8 @@ estimator [2]; product quantization [1] is the next codec in line.
 **Caveats.** One corpus, two small models, no relevance labels, no chat model. Nothing here
 says whether 0.61 recall changes an answer. That is the next experiment.
 
+**Follow-up.** The centring step suggested above is measured in
+[SciFact: mean-centred binary against plain binary]({{ "/experiments/scifact-centred-binary/" | relative_url }}):
+it fixes the scores and recovers only four or five points of recall.
+
 {% include references.html %}
