@@ -655,3 +655,121 @@ fn bench_run_records_model_errors_and_continues() {
     assert!(!out.status.success());
     assert!(stderr(&out).contains("--fail-fast"));
 }
+
+#[test]
+fn beir_import_feeds_labelled_recall_and_bench_run() {
+    let env = Env::new();
+    let beir = env.dir.path().join("beir");
+    std::fs::create_dir_all(beir.join("qrels")).unwrap();
+    std::fs::write(
+        beir.join("corpus.jsonl"),
+        format!(
+            "{}\n{}\n{}\n",
+            serde_json::json!({"_id": "100", "title": "Refunds", "text": REFUNDS}),
+            serde_json::json!({"_id": "200", "title": "Shipping", "text": SHIPPING}),
+            serde_json::json!({"_id": "300", "title": "Other", "text": "Unrelated notes about office plants and watering schedules."}),
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        beir.join("queries.jsonl"),
+        concat!(
+            "{\"_id\":\"q1\",\"text\":\"refund window thirty days\"}\n",
+            "{\"_id\":\"q2\",\"text\":\"shipping business days\"}\n",
+            "{\"_id\":\"q9\",\"text\":\"never judged\"}\n"
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        beir.join("qrels/test.tsv"),
+        "query-id\tcorpus-id\tscore\nq1\t100\t1\nq2\t200\t1\nq2\t300\t0\n",
+    )
+    .unwrap();
+
+    let qs = env.dir.path().join("qs/beir-test.jsonl");
+    let corpus = env.dir.path().join("corpus");
+    let out = env.run(&[
+        "questions",
+        "import-beir",
+        beir.to_str().unwrap(),
+        "--out",
+        qs.to_str().unwrap(),
+        "--corpus-out",
+        corpus.to_str().unwrap(),
+    ]);
+    assert_ok(&out, "import-beir");
+    assert!(stdout(&out).contains("2 questions"), "{}", stdout(&out));
+    assert!(stdout(&out).contains("2 with relevance judgments, 2 judgments"), "{}", stdout(&out));
+    assert!(corpus.join("100.txt").exists() && corpus.join("300.txt").exists());
+    let text = std::fs::read_to_string(&qs).unwrap();
+    assert!(text.starts_with("# Imported from BEIR"), "{text}");
+    assert!(text.contains("\"relevant\":[\"100\"]"), "{text}");
+
+    let out = env.run(&["questions", "check", qs.to_str().unwrap()]);
+    assert_ok(&out, "questions check");
+    assert!(stdout(&out).contains("0 with gold answers"), "{}", stdout(&out));
+
+    assert_ok(
+        &env.run(&["ingest", corpus.to_str().unwrap(), "--collection", "beir", "--ext", "txt"]),
+        "ingest corpus",
+    );
+
+    // Labelled recall: the hash embedder puts the right document first for both queries.
+    let out = env.run(&[
+        "bench",
+        "recall",
+        "--collection",
+        "beir",
+        "--questions",
+        qs.to_str().unwrap(),
+        "--codecs",
+        "int8",
+        "-k",
+        "1",
+        "--json",
+    ]);
+    assert_ok(&out, "bench recall --questions");
+    let reports: Vec<serde_json::Value> = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(reports[0]["codec"], "f32");
+    assert_eq!(reports[0]["labelled_queries"], 2);
+    assert_eq!(reports[0]["ndcg_at_k"], 1.0);
+    assert_eq!(reports[0]["doc_recall_at_k"], 1.0);
+    assert!(reports[1]["ndcg_at_k"].as_f64().unwrap() <= 1.0);
+    let table = env.run(&[
+        "bench",
+        "recall",
+        "--collection",
+        "beir",
+        "--questions",
+        qs.to_str().unwrap(),
+        "--no-record",
+    ]);
+    assert_ok(&table, "bench recall table");
+    assert!(stdout(&table).contains("ndcg@k"), "{}", stdout(&table));
+
+    // A bench run records the judgment metrics per question and the report averages them.
+    let out = env.run(&[
+        "bench",
+        "run",
+        "--questions",
+        qs.to_str().unwrap(),
+        "--collections",
+        "beir",
+        "-k",
+        "1",
+    ]);
+    assert_ok(&out, "bench run");
+    let batch = stderr(&out)
+        .lines()
+        .find_map(|l| l.strip_prefix("batch ").map(|l| l.split(':').next().unwrap().to_owned()))
+        .unwrap();
+    let out = env.run(&["report", "--batch", &batch, "--json"]);
+    assert_ok(&out, "report");
+    let cells: Vec<serde_json::Value> = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(cells.len(), 1);
+    assert_eq!(cells[0]["source_hit"], 1.0);
+    assert_eq!(cells[0]["ndcg"], 1.0);
+    assert_eq!(cells[0]["doc_recall"], 1.0);
+    let show = env.run(&["runs", "list", "-n", "1"]);
+    assert_ok(&show, "runs list");
+}

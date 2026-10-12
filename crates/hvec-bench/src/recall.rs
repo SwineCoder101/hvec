@@ -3,6 +3,10 @@
 //! No chat model is involved, so this is free and fast. For each query the
 //! exact top-k under f32 is the ground truth; the codec's top-k is compared
 //! to it. Score error is measured over every (query, vector) pair.
+//!
+//! When queries carry relevance judgments and the stored vectors carry their
+//! source paths, the same scan also reports nDCG@k and document recall@k
+//! against the labels, for the codec and for the f32 baseline alike.
 
 use std::time::Instant;
 
@@ -10,12 +14,15 @@ use hvec_core::{Codec, CodecError, Metric, distance};
 use serde::{Deserialize, Serialize};
 
 use crate::metrics::recall_at_k;
+use crate::questions::relevance;
 
-/// A query vector, optionally excluding one stored id (itself) from ranking.
-#[derive(Debug, Clone)]
+/// A query vector, optionally excluding one stored id (itself) from ranking,
+/// optionally with the ids of the documents judged relevant to it.
+#[derive(Debug, Clone, Default)]
 pub struct RecallQuery {
     pub vector: Vec<f32>,
     pub exclude: Option<i64>,
+    pub relevant: Vec<String>,
 }
 
 /// What one codec did on one collection.
@@ -39,6 +46,13 @@ pub struct RecallReport {
     pub scan_ms: u64,
     /// The same scan with exact f32 arithmetic.
     pub baseline_scan_ms: u64,
+    /// Queries that carried relevance judgments.
+    pub labelled_queries: usize,
+    /// Mean nDCG@k against the judgments, over labelled queries. `None` when
+    /// no query is labelled or sources were not supplied.
+    pub ndcg_at_k: Option<f64>,
+    /// Mean fraction of relevant documents among the codec's top-k.
+    pub doc_recall_at_k: Option<f64>,
 }
 
 fn top_k(scores: &[(i64, f32)], k: usize, metric: Metric) -> Vec<i64> {
@@ -52,6 +66,9 @@ fn top_k(scores: &[(i64, f32)], k: usize, metric: Metric) -> Vec<i64> {
 }
 
 /// Evaluate `codec` on `(id, f32 vector)` pairs with the given queries.
+///
+/// `sources`, when given, aligns with `ids` and holds each vector's source
+/// path; it is what the label metrics need to map a chunk to its document.
 pub fn evaluate(
     ids: &[i64],
     vectors: &[Vec<f32>],
@@ -59,8 +76,16 @@ pub fn evaluate(
     codec: &dyn Codec,
     metric: Metric,
     k: usize,
+    sources: Option<&[String]>,
 ) -> Result<RecallReport, CodecError> {
     assert_eq!(ids.len(), vectors.len(), "ids and vectors must align");
+    if let Some(s) = sources {
+        assert_eq!(s.len(), ids.len(), "ids and sources must align");
+    }
+    let source_of = |id: i64| -> Option<&String> {
+        let s = sources?;
+        ids.iter().position(|x| *x == id).map(|i| &s[i])
+    };
 
     let t = Instant::now();
     let encoded = vectors.iter().map(|v| codec.encode(v)).collect::<Result<Vec<_>, _>>()?;
@@ -73,6 +98,9 @@ pub fn evaluate(
     let mut pairs = 0usize;
     let mut scan_ms = 0u64;
     let mut baseline_scan_ms = 0u64;
+    let mut labelled = 0usize;
+    let mut ndcg_sum = 0f64;
+    let mut doc_recall_sum = 0f64;
 
     for q in queries {
         let t = Instant::now();
@@ -105,9 +133,18 @@ pub fn evaluate(
         if !truth.is_empty() && truth.first() == got.first() {
             top1_hits += 1;
         }
+        if sources.is_some() && !q.relevant.is_empty() {
+            let retrieved: Vec<String> = got.iter().filter_map(|id| source_of(*id).cloned()).collect();
+            if let Some(r) = relevance(&q.relevant, &retrieved) {
+                labelled += 1;
+                ndcg_sum += r.ndcg;
+                doc_recall_sum += r.doc_recall;
+            }
+        }
     }
 
     let nq = queries.len().max(1) as f64;
+    let labelled_mean = |sum: f64| if labelled == 0 { None } else { Some(sum / labelled as f64) };
     Ok(RecallReport {
         codec: codec.name().to_owned(),
         metric,
@@ -123,6 +160,9 @@ pub fn evaluate(
         encode_ms,
         scan_ms,
         baseline_scan_ms,
+        labelled_queries: labelled,
+        ndcg_at_k: labelled_mean(ndcg_sum),
+        doc_recall_at_k: labelled_mean(doc_recall_sum),
     })
 }
 
@@ -141,6 +181,7 @@ pub fn self_queries(ids: &[i64], vectors: &[Vec<f32>], n: usize) -> Vec<RecallQu
             RecallQuery {
                 vector: vectors[idx].clone(),
                 exclude: Some(ids[idx]),
+                relevant: Vec::new(),
             }
         })
         .collect()
@@ -183,22 +224,46 @@ mod tests {
     fn f32_codec_is_perfect() {
         let (ids, vecs) = clustered();
         let queries = self_queries(&ids, &vecs, 20);
-        let r = evaluate(&ids, &vecs, &queries, &F32Codec::new(64), Metric::Cosine, 10).unwrap();
+        let r = evaluate(&ids, &vecs, &queries, &F32Codec::new(64), Metric::Cosine, 10, None).unwrap();
         assert_eq!(r.recall_at_k, 1.0);
         assert_eq!(r.top1_agreement, 1.0);
         assert_eq!(r.mean_abs_score_error, 0.0);
         assert_eq!(r.queries, 20);
         assert_eq!(r.vectors, 200);
+        assert_eq!(r.labelled_queries, 0);
+        assert_eq!(r.ndcg_at_k, None);
+    }
+
+    #[test]
+    fn label_metrics_follow_cluster_membership() {
+        // Each cluster is one "document"; a self-query's relevant document is
+        // its own cluster, so f32 scores a perfect nDCG and binary a lower one.
+        let (ids, vecs) = clustered();
+        let sources: Vec<String> = ids.iter().map(|id| format!("corpus/c{}.txt", id / 100)).collect();
+        let mut queries = self_queries(&ids, &vecs, 16);
+        for q in &mut queries {
+            let own = q.exclude.unwrap() / 100;
+            q.relevant = vec![format!("c{own}")];
+        }
+        let f = evaluate(&ids, &vecs, &queries, &F32Codec::new(64), Metric::Cosine, 5, Some(&sources)).unwrap();
+        assert_eq!(f.labelled_queries, 16);
+        assert_eq!(f.ndcg_at_k, Some(1.0));
+        assert_eq!(f.doc_recall_at_k, Some(1.0));
+        let b = evaluate(&ids, &vecs, &queries, &BinaryCodec::new(64), Metric::Cosine, 5, Some(&sources)).unwrap();
+        assert!(b.ndcg_at_k.unwrap() <= 1.0 && b.ndcg_at_k.unwrap() > 0.0);
+        // Without sources the labels cannot be applied.
+        let none = evaluate(&ids, &vecs, &queries, &F32Codec::new(64), Metric::Cosine, 5, None).unwrap();
+        assert_eq!(none.labelled_queries, 0);
     }
 
     #[test]
     fn int8_is_near_perfect_and_binary_is_decent_on_clusters() {
         let (ids, vecs) = clustered();
         let queries = self_queries(&ids, &vecs, 40);
-        let i8 = evaluate(&ids, &vecs, &queries, &Int8Codec::new(64), Metric::Cosine, 10).unwrap();
+        let i8 = evaluate(&ids, &vecs, &queries, &Int8Codec::new(64), Metric::Cosine, 10, None).unwrap();
         assert!(i8.recall_at_k >= 0.95, "int8 recall {}", i8.recall_at_k);
         assert!(i8.mean_abs_score_error < 0.01, "int8 err {}", i8.mean_abs_score_error);
-        let bin = evaluate(&ids, &vecs, &queries, &BinaryCodec::new(64), Metric::Cosine, 10).unwrap();
+        let bin = evaluate(&ids, &vecs, &queries, &BinaryCodec::new(64), Metric::Cosine, 10, None).unwrap();
         assert!(bin.recall_at_k >= 0.5, "binary recall {}", bin.recall_at_k);
         assert!(bin.recall_at_k <= i8.recall_at_k);
         assert_eq!(bin.bytes_per_vector, 8);
@@ -211,7 +276,7 @@ mod tests {
         let q = self_queries(&ids, &vecs, 5);
         assert_eq!(q.len(), 5);
         assert!(q.iter().all(|x| x.exclude.is_some()));
-        let r = evaluate(&ids, &vecs, &q, &F32Codec::new(64), Metric::L2, 3).unwrap();
+        let r = evaluate(&ids, &vecs, &q, &F32Codec::new(64), Metric::L2, 3, None).unwrap();
         assert_eq!(r.recall_at_k, 1.0);
         assert!(self_queries(&ids, &vecs, 0).is_empty());
         assert_eq!(self_queries(&ids, &vecs, 10_000).len(), vecs.len());

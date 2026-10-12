@@ -3,6 +3,7 @@ pub mod config;
 pub mod ingest;
 pub mod list;
 pub mod query;
+pub mod questions;
 pub mod shell;
 
 /// Shared retrieve-then-answer step used by `query` and `chat`.
@@ -35,8 +36,21 @@ pub mod rag {
         /// Embed the question, retrieve `k` passages, and ask the model with
         /// the prior `history` prepended. Measures each stage.
         pub async fn answer(&self, history: Vec<Message>, question: &str, k: usize) -> Result<TurnOutcome> {
+            self.answer_with_query(history, question, question, k).await
+        }
+
+        /// Like [`Pipeline::answer`], but embeds `query` for retrieval while
+        /// the model is asked `question`. A question set's `query` field uses
+        /// this to phrase the prompt without changing the retrieval text.
+        pub async fn answer_with_query(
+            &self,
+            history: Vec<Message>,
+            query: &str,
+            question: &str,
+            k: usize,
+        ) -> Result<TurnOutcome> {
             let t = Instant::now();
-            let mut qv = self.embedder.embed(std::slice::from_ref(&question.to_owned())).await?;
+            let mut qv = self.embedder.embed(std::slice::from_ref(&query.to_owned())).await?;
             let query = qv.pop().ok_or_else(|| anyhow::anyhow!("embedder returned no vector"))?;
             let embed_ms = t.elapsed().as_millis() as u64;
 

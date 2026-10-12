@@ -62,6 +62,9 @@ pub enum Command {
     /// Benchmarks. `bench recall` needs no chat model; `bench run` does.
     #[command(subcommand)]
     Bench(BenchCommand),
+    /// Build and inspect question sets.
+    #[command(subcommand)]
+    Questions(QuestionsCommand),
     /// Summarise `bench run` results by matrix cell.
     Report(ReportArgs),
     /// Ask one question against a collection and record the run.
@@ -111,6 +114,38 @@ pub enum RunsCommand {
     },
     /// Print one run as JSON. Accepts an id prefix.
     Show { id: String },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum QuestionsCommand {
+    /// Import a BEIR-format dataset directory (corpus.jsonl, queries.jsonl, qrels/) as a question set.
+    ImportBeir(ImportBeirArgs),
+    /// Validate a question set and print what it contains.
+    Check {
+        /// JSONL question set.
+        path: PathBuf,
+    },
+}
+
+#[derive(Debug, Args)]
+pub struct ImportBeirArgs {
+    /// The dataset directory.
+    pub dir: PathBuf,
+    /// Where to write the JSONL question set.
+    #[arg(short, long)]
+    pub out: PathBuf,
+    /// Which qrels split to take questions from.
+    #[arg(long, default_value = "test")]
+    pub split: String,
+    /// Also write the corpus as one `<id>.txt` per document into this directory, ready for `hvec ingest`.
+    #[arg(long)]
+    pub corpus_out: Option<PathBuf>,
+    /// SciFact only: a `claims_*.jsonl` from the original release, to add supports/refutes gold answers.
+    #[arg(long)]
+    pub scifact_claims: Option<PathBuf>,
+    /// Keep only the first N questions.
+    #[arg(long)]
+    pub limit: Option<usize>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -174,8 +209,11 @@ pub struct RecallArgs {
     #[arg(long, default_value_t = 100)]
     pub sample: usize,
     /// A text file with one query per line, embedded with the collection's embedder, instead of self-queries.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "questions")]
     pub queries: Option<PathBuf>,
+    /// A JSONL question set; questions with `relevant` judgments also yield nDCG@k and document recall@k.
+    #[arg(long)]
+    pub questions: Option<PathBuf>,
     /// Do not write the results to the run log.
     #[arg(long)]
     pub no_record: bool,

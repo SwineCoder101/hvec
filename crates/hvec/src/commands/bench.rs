@@ -103,16 +103,22 @@ async fn run_cmd(config: &Option<PathBuf>, args: BenchRunArgs) -> Result<()> {
                     "question": q.question,
                     "answers": q.answers,
                     "source": q.source,
+                    "relevant": q.relevant,
+                    "query": q.query,
                     "prompt_version": hvec_bench::prompt::PROMPT_VERSION,
                     "dimension": collection.dimension,
                     "k": args.k,
                 });
 
-                match pipeline.answer(Vec::new(), &q.question, args.k).await {
+                match pipeline
+                    .answer_with_query(Vec::new(), q.retrieval_text(), &q.question, args.k)
+                    .await
+                {
                     Ok(outcome) => {
                         let score = questions::score_answer(&outcome.response.text, &q.answers);
                         let sources: Vec<String> = outcome.hits.iter().map(|h| h.source.clone()).collect();
-                        let hit = questions::source_hit(q.source.as_deref(), &sources);
+                        let hit = questions::source_hit(q.source.as_deref(), &q.relevant, &sources);
+                        let rel = questions::relevance(&q.relevant, &sources);
                         metadata["chat_model_served"] = serde_json::json!(outcome.response.model);
                         metadata["answer"] = serde_json::json!(outcome.response.text);
                         metadata["stop_reason"] = serde_json::json!(outcome.response.stop_reason);
@@ -120,6 +126,8 @@ async fn run_cmd(config: &Option<PathBuf>, args: BenchRunArgs) -> Result<()> {
                         metrics["exact"] = serde_json::json!(score.exact);
                         metrics["contains"] = serde_json::json!(score.contains);
                         metrics["source_hit"] = serde_json::json!(hit);
+                        metrics["doc_recall"] = serde_json::json!(rel.map(|r| r.doc_recall));
+                        metrics["ndcg"] = serde_json::json!(rel.map(|r| r.ndcg));
                         row.metrics = metrics;
                         eprintln!(
                             "[{done}/{total}] {} · {} · {} → {}{}",
@@ -191,7 +199,7 @@ pub fn report(config: &Option<PathBuf>, args: &ReportArgs) -> Result<()> {
 fn print_cells(cells: &[Cell]) {
     let mut rerouted = 0usize;
     println!(
-        "{:<12} {:<18} {:<26} {:<15} {:<24} {:>4} {:>6} {:>8} {:>7} {:>7} {:>7} {:>6} {:>6} {:>4}",
+        "{:<12} {:<18} {:<26} {:<15} {:<24} {:>4} {:>6} {:>8} {:>7} {:>6} {:>7} {:>7} {:>6} {:>6} {:>4}",
         "set",
         "collection",
         "embed model",
@@ -201,6 +209,7 @@ fn print_cells(cells: &[Cell]) {
         "exact",
         "contains",
         "src hit",
+        "ndcg",
         "ret ms",
         "gen ms",
         "in",
@@ -210,7 +219,7 @@ fn print_cells(cells: &[Cell]) {
     for c in cells {
         let embed = c.key.embed_model.rsplit('/').next().unwrap_or(&c.key.embed_model);
         println!(
-            "{:<12} {:<18} {:<26} {:<15} {:<24} {:>4} {:>6.3} {:>8.3} {:>7} {:>7.0} {:>7.0} {:>6.0} {:>6.0} {:>4}",
+            "{:<12} {:<18} {:<26} {:<15} {:<24} {:>4} {:>6.3} {:>8.3} {:>7} {:>6} {:>7.0} {:>7.0} {:>6.0} {:>6.0} {:>4}",
             trunc(&c.key.question_set, 12),
             trunc(&c.key.collection, 18),
             trunc(embed, 26),
@@ -220,6 +229,7 @@ fn print_cells(cells: &[Cell]) {
             c.exact,
             c.contains,
             c.source_hit.map_or("-".to_owned(), |v| format!("{v:.3}")),
+            c.ndcg.map_or("-".to_owned(), |v| format!("{v:.3}")),
             c.mean_retrieval_ms,
             c.mean_generation_ms,
             c.mean_input_tokens,
@@ -263,16 +273,35 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
     }
 
     let baseline = F32Codec::new(collection.dimension);
-    let (ids, vectors): (Vec<i64>, Vec<Vec<f32>>) = store
-        .vectors(&collection.name)?
-        .into_iter()
-        .map(|(id, enc)| baseline.decode(&enc).map(|v| (id, v)))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .unzip();
+    let mut ids: Vec<i64> = Vec::new();
+    let mut sources: Vec<String> = Vec::new();
+    let mut vectors: Vec<Vec<f32>> = Vec::new();
+    for (id, source, enc) in store.vectors_with_sources(&collection.name)? {
+        ids.push(id);
+        sources.push(source);
+        vectors.push(baseline.decode(&enc)?);
+    }
 
-    let (queries, query_source) = match &args.queries {
-        Some(path) => {
+    let (queries, query_source) = match (&args.queries, &args.questions) {
+        (_, Some(path)) => {
+            let qs = questions::load(path)?;
+            let texts: Vec<String> = qs.iter().map(|q| q.retrieval_text().to_owned()).collect();
+            let embedder = hvec_connect::embedder(&ctx.config, &collection.embed_profile).await?;
+            let vectors = embedder.embed(&texts).await?;
+            let labelled = qs.iter().filter(|q| !q.relevant.is_empty()).count();
+            let queries: Vec<RecallQuery> = vectors
+                .into_iter()
+                .zip(qs)
+                .map(|(vector, q)| RecallQuery {
+                    vector,
+                    exclude: None,
+                    relevant: q.relevant,
+                })
+                .collect();
+            let n = queries.len();
+            (queries, format!("questions:{} ({n} questions, {labelled} with judgments)", path.display()))
+        }
+        (Some(path), None) => {
             let text = tokio::fs::read_to_string(path)
                 .await
                 .with_context(|| format!("reading {}", path.display()))?;
@@ -290,11 +319,15 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
                 .embed(&lines)
                 .await?
                 .into_iter()
-                .map(|vector| RecallQuery { vector, exclude: None })
+                .map(|vector| RecallQuery {
+                    vector,
+                    exclude: None,
+                    relevant: Vec::new(),
+                })
                 .collect();
             (qs, format!("file:{}", path.display()))
         }
-        None => (
+        (None, None) => (
             recall::self_queries(&ids, &vectors, args.sample),
             format!("self-queries:{}", args.sample.min(vectors.len())),
         ),
@@ -312,7 +345,15 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
         if fitted {
             codec.fit(&vectors)?;
         }
-        let report = recall::evaluate(&ids, &vectors, &queries, codec.as_ref(), collection.metric, args.k)?;
+        let report = recall::evaluate(
+            &ids,
+            &vectors,
+            &queries,
+            codec.as_ref(),
+            collection.metric,
+            args.k,
+            Some(&sources),
+        )?;
         if !args.no_record {
             let mut row = RunRow::new("recall");
             row.collection = Some(collection.name.clone());
@@ -347,13 +388,23 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
     );
     println!("queries: {query_source}");
     println!();
+    let labelled = reports.first().is_some_and(|r| r.labelled_queries > 0);
     println!(
-        "{:<15} {:>9} {:>7} {:>10} {:>10} {:>8} {:>7} {:>9} {:>8}",
-        "codec", "recall@k", "top1", "mean err", "max err", "bytes", "ratio", "encode ms", "scan ms"
+        "{:<15} {:>9} {:>7} {:>10} {:>10} {:>8} {:>7} {:>9} {:>8}{}",
+        "codec",
+        "recall@k",
+        "top1",
+        "mean err",
+        "max err",
+        "bytes",
+        "ratio",
+        "encode ms",
+        "scan ms",
+        if labelled { "   ndcg@k  doc rec" } else { "" }
     );
     for r in &reports {
         println!(
-            "{:<15} {:>9.4} {:>7.3} {:>10.5} {:>10.5} {:>8} {:>6.1}x {:>9} {:>8}",
+            "{:<15} {:>9.4} {:>7.3} {:>10.5} {:>10.5} {:>8} {:>6.1}x {:>9} {:>8}{}",
             r.codec,
             r.recall_at_k,
             r.top1_agreement,
@@ -362,7 +413,17 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
             r.bytes_per_vector,
             r.compression_ratio,
             r.encode_ms,
-            r.scan_ms
+            r.scan_ms,
+            match (r.ndcg_at_k, r.doc_recall_at_k) {
+                (Some(n), Some(d)) => format!("  {n:>7.4} {d:>8.4}"),
+                _ => String::new(),
+            }
+        );
+    }
+    if labelled {
+        println!(
+            "\nndcg@k and doc rec are against the question set's relevance judgments ({} labelled queries); the f32 row is the ceiling the codec is measured against",
+            reports[0].labelled_queries
         );
     }
     if !args.no_record {

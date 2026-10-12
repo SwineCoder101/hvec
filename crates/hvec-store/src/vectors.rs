@@ -173,6 +173,22 @@ impl Store {
         rows.collect::<std::result::Result<_, _>>().map_err(Into::into)
     }
 
+    /// Every stored chunk's id, source path and encoded vector, in insertion order.
+    pub fn vectors_with_sources(&self, collection: &str) -> Result<Vec<(i64, String, Encoded)>> {
+        self.require_collection(collection)?;
+        let mut stmt = self
+            .conn
+            .prepare_cached("SELECT id, source, vector FROM chunks WHERE collection = ?1 ORDER BY id")?;
+        let rows = stmt.query_map(params![collection], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                Encoded(row.get::<_, Vec<u8>>(2)?),
+            ))
+        })?;
+        rows.collect::<std::result::Result<_, _>>().map_err(Into::into)
+    }
+
     /// Brute-force top-k search scored through the codec.
     ///
     /// Scores every stored vector against `query` in the compressed domain,

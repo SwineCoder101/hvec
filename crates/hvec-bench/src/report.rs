@@ -22,8 +22,12 @@ pub struct Cell {
     pub n: usize,
     pub exact: f64,
     pub contains: f64,
-    /// Fraction of questions with a source hint whose retrieval hit it. `None` if no hints.
+    /// Fraction of questions with a retrieval label whose retrieval hit it. `None` if none.
     pub source_hit: Option<f64>,
+    /// Mean fraction of judged-relevant documents retrieved, over questions with judgments.
+    pub doc_recall: Option<f64>,
+    /// Mean nDCG@k against the judgments, over questions with judgments.
+    pub ndcg: Option<f64>,
     pub mean_retrieval_ms: f64,
     pub mean_generation_ms: f64,
     pub mean_input_tokens: f64,
@@ -76,6 +80,14 @@ pub fn aggregate(rows: &[RunRow]) -> Vec<Cell> {
                         / hinted.len() as f64,
                 )
             };
+            let judged: Vec<&&&RunRow> = ok.iter().filter(|r| !r.metrics["ndcg"].is_null()).collect();
+            let judged_mean = |field: &str| {
+                if judged.is_empty() {
+                    None
+                } else {
+                    Some(judged.iter().map(|r| num(&r.metrics[field])).sum::<f64>() / judged.len() as f64)
+                }
+            };
             Cell {
                 key,
                 n,
@@ -94,6 +106,8 @@ pub fn aggregate(rows: &[RunRow]) -> Vec<Cell> {
                     }
                 }),
                 source_hit,
+                doc_recall: judged_mean("doc_recall"),
+                ndcg: judged_mean("ndcg"),
                 mean_retrieval_ms: mean(&|r| num(&r.metrics["retrieval_ms"])),
                 mean_generation_ms: mean(&|r| num(&r.metrics["generation_ms"])),
                 mean_input_tokens: mean(&|r| num(&r.metrics["input_tokens"])),
@@ -148,6 +162,21 @@ mod tests {
         assert_eq!(bin.source_hit, None);
         assert_eq!(bin.contains, 0.0);
         assert_eq!(f32.served_other, 0);
+        assert_eq!(f32.ndcg, None);
+    }
+
+    #[test]
+    fn judged_rows_average_ndcg_and_doc_recall() {
+        let mut a = row("qa", "f32", "opus", true, true, Some(true), 1);
+        a.metrics["ndcg"] = serde_json::json!(1.0);
+        a.metrics["doc_recall"] = serde_json::json!(0.5);
+        let mut b = row("qa", "f32", "opus", true, true, Some(false), 1);
+        b.metrics["ndcg"] = serde_json::json!(0.0);
+        b.metrics["doc_recall"] = serde_json::json!(0.0);
+        let unjudged = row("qa", "f32", "opus", true, true, None, 1);
+        let cells = aggregate(&[a, b, unjudged]);
+        assert_eq!(cells[0].ndcg, Some(0.5));
+        assert_eq!(cells[0].doc_recall, Some(0.25));
     }
 
     #[test]
