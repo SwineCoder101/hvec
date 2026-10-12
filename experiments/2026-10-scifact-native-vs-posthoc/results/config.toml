@@ -1,0 +1,21 @@
+db_path = "/Users/liam/dev/hvec/experiments/2026-10-scifact-native-vs-posthoc/work/hvec.db"
+default_chat = "anthropic"
+default_embedder = "bge-small"
+metric = "cosine"
+
+[chat.anthropic]
+provider = "anthropic"
+model = "claude-opus-5-5"
+api_key_env = "ANTHROPIC_API_KEY"
+
+# Conventional 384-dim model, no task prefixes (as in the earlier SciFact experiments).
+[embed.bge-small]
+provider = "local"
+model = "BGESmallENV15"
+
+# Matryoshka-trained 768-dim model; trained with these task prefixes.
+[embed.nomic]
+provider = "local"
+model = "NomicEmbedTextV15"
+query_prefix = "search_query: "
+document_prefix = "search_document: "
