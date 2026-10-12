@@ -101,6 +101,16 @@ pub trait Embedder: Send + Sync + std::fmt::Debug {
     fn model_id(&self) -> &str;
     /// Output dimensionality. Known up front for every supported provider.
     fn dimension(&self) -> usize;
-    /// Embed a batch of texts, preserving order.
+    /// Embed a batch of texts as given, preserving order.
     async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>>;
+
+    /// Embed texts that will be stored. Models with a document prefix add it here.
+    async fn embed_documents(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+        self.embed(texts).await
+    }
+
+    /// Embed texts that will be searched with. Models with a query prefix add it here.
+    async fn embed_queries(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+        self.embed(texts).await
+    }
 }

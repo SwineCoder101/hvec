@@ -29,7 +29,7 @@ pub async fn run(config: &Option<PathBuf>, args: IngestArgs) -> Result<()> {
     let dimension = embedder.dimension();
     let mut codec = codec_by_name(&args.codec, dimension)?;
 
-    let codec_name = codec.name();
+    let codec_name = codec.name().to_owned();
 
     let mut store = ctx.open_store()?;
     fn describe<'a>(
@@ -64,7 +64,7 @@ pub async fn run(config: &Option<PathBuf>, args: IngestArgs) -> Result<()> {
             &args,
             &embed_name,
             embedder.as_ref(),
-            codec_name,
+            &codec_name,
             metric,
             &[],
         ))?;
@@ -123,7 +123,7 @@ pub async fn run(config: &Option<PathBuf>, args: IngestArgs) -> Result<()> {
             &args,
             &embed_name,
             embedder.as_ref(),
-            codec_name,
+            &codec_name,
             metric,
             &codec.params(),
         ))?;
@@ -145,7 +145,7 @@ pub async fn run(config: &Option<PathBuf>, args: IngestArgs) -> Result<()> {
             &args,
             &embed_name,
             embedder.as_ref(),
-            codec_name,
+            &codec_name,
             metric,
             &codec.params(),
         ))?;
@@ -199,7 +199,7 @@ async fn read_chunks(file: &Path, opts: ChunkOptions) -> Result<Vec<String>> {
 async fn embed_all(embedder: &dyn Embedder, pieces: &[String], batch: usize) -> Result<Vec<Vec<f32>>> {
     let mut out = Vec::with_capacity(pieces.len());
     for group in pieces.chunks(batch) {
-        out.extend(embedder.embed(group).await?);
+        out.extend(embedder.embed_documents(group).await?);
     }
     Ok(out)
 }

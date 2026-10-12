@@ -105,6 +105,12 @@ pub struct EmbedProfile {
     /// Local only: where downloaded model files are cached.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache_dir: Option<PathBuf>,
+    /// Text put in front of every query, for models trained with one (`search_query: `, `query: `).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_prefix: Option<String>,
+    /// Text put in front of every stored document (`search_document: `, `passage: `).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub document_prefix: Option<String>,
 }
 
 impl Config {

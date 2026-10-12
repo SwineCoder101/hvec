@@ -51,7 +51,10 @@ pub mod rag {
             k: usize,
         ) -> Result<TurnOutcome> {
             let t = Instant::now();
-            let mut qv = self.embedder.embed(std::slice::from_ref(&query.to_owned())).await?;
+            let mut qv = self
+                .embedder
+                .embed_queries(std::slice::from_ref(&query.to_owned()))
+                .await?;
             let query = qv.pop().ok_or_else(|| anyhow::anyhow!("embedder returned no vector"))?;
             let embed_ms = t.elapsed().as_millis() as u64;
 

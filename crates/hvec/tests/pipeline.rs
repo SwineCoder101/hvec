@@ -895,3 +895,111 @@ fn judge_grades_a_batch_and_reports_agreement() {
     assert_eq!(a["judge_only"], 1);
     assert_eq!(a["contains_only"], 1);
 }
+
+#[test]
+fn pq_and_truncation_codecs_ingest_query_and_bench() {
+    let env = Env::new();
+    for i in 0..12 {
+        env.write_doc(
+            &format!("note{i}.md"),
+            &format!("Note {i} about topic number {i}: details, remarks and item {i} for subject {i}."),
+        );
+    }
+    let dir = env.dir.path().to_str().unwrap().to_owned();
+    env.write_doc("refunds.md", REFUNDS);
+    assert_ok(&env.run(&["ingest", &dir, "--collection", "f32"]), "ingest f32");
+    // Trained pq and composed truncation codecs round-trip through a collection.
+    // The hash embedder spreads words over 128 buckets, so the query carries several words to
+    // survive truncation to a prefix.
+    for (col, codec) in [("pq", "pq16"), ("mrl", "mrl64+int8"), ("mrlpq", "mrl96+pq8")] {
+        let out = env.run(&["ingest", &dir, "--collection", col, "--codec", codec]);
+        assert_ok(&out, codec);
+        let out = env.run(&[
+            "query",
+            "refund window thirty days original payment method?",
+            "--collection",
+            col,
+            "-k",
+            "1",
+            "--json",
+        ]);
+        assert_ok(&out, "query");
+        let row: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+        assert_eq!(row["codec"], codec);
+        assert!(
+            row["metrics"]["retrieved"][0]["source"]
+                .as_str()
+                .unwrap()
+                .ends_with("refunds.md"),
+            "{codec}: {row}"
+        );
+    }
+    let list = stdout(&env.run(&["collections", "list"]));
+    assert!(
+        list.contains("pq16") && list.contains("mrl64+int8") && list.contains("mrl96+pq8"),
+        "{list}"
+    );
+
+    let out = env.run(&[
+        "bench",
+        "recall",
+        "--collection",
+        "f32",
+        "--codecs",
+        "pq16,pq,mrl64,mrl64+binary",
+        "-k",
+        "3",
+        "--sample",
+        "5",
+        "--json",
+        "--no-record",
+    ]);
+    assert_ok(&out, "bench recall");
+    let reports: Vec<serde_json::Value> = serde_json::from_str(&stdout(&out)).unwrap();
+    let names: Vec<&str> = reports.iter().map(|r| r["codec"].as_str().unwrap()).collect();
+    assert_eq!(names, ["f32", "pq16", "pq16", "mrl64", "mrl64+binary"]);
+    assert_eq!(reports[1]["bytes_per_vector"], 16);
+    assert_eq!(reports[1]["compression_ratio"], 32.0);
+    assert_eq!(reports[3]["bytes_per_vector"], 256);
+    assert_eq!(reports[4]["bytes_per_vector"], 8);
+    assert!(reports[1]["recall_at_k"].as_f64().unwrap() > 0.0);
+
+    let bad = env.run(&["ingest", &dir, "--collection", "bad", "--codec", "pq7"]);
+    assert!(!bad.status.success());
+    assert!(stderr(&bad).contains("not a positive multiple"), "{}", stderr(&bad));
+}
+
+#[test]
+fn embedding_prefixes_apply_to_documents_and_queries() {
+    let env = Env::new();
+    let mut cfg = std::fs::read_to_string(&env.config_path).unwrap();
+    cfg.push_str("\n[embed.prefixed]\nprovider = \"hash\"\nmodel = \"hash-128\"\ndimension = 128\nquery_prefix = \"search_query: \"\ndocument_prefix = \"search_document: \"\n");
+    std::fs::write(&env.config_path, cfg).unwrap();
+    let a = env.write_doc("refunds.md", REFUNDS);
+    assert_ok(
+        &env.run(&[
+            "ingest",
+            a.to_str().unwrap(),
+            "--collection",
+            "p",
+            "--embedder",
+            "prefixed",
+        ]),
+        "ingest prefixed",
+    );
+    assert_ok(
+        &env.run(&["ingest", a.to_str().unwrap(), "--collection", "plain"]),
+        "ingest plain",
+    );
+    // Same model, different stored vectors: the document prefix changed the hash input.
+    let out = env.run(&["query", "refund?", "--collection", "p", "-k", "1", "--json"]);
+    assert_ok(&out, "query prefixed");
+    let p: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    let out = env.run(&["query", "refund?", "--collection", "plain", "-k", "1", "--json"]);
+    assert_ok(&out, "query plain");
+    let q: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_ne!(
+        p["metrics"]["retrieved"][0]["score"],
+        q["metrics"]["retrieved"][0]["score"]
+    );
+}

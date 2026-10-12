@@ -90,8 +90,10 @@ pub struct Encoded(pub Vec<u8>);
 /// Implementations must document their error model: exact, bounded, or
 /// approximate for each supported metric.
 pub trait Codec: Send + Sync + std::fmt::Debug {
-    /// Stable identifier recorded in the run log, for example `f32` or `int8`.
-    fn name(&self) -> &'static str;
+    /// Stable identifier recorded in the run log, for example `f32`, `int8`
+    /// or `pq48`. Parametrised codecs spell their parameters into the name so
+    /// that [`codec_by_name`] can rebuild the same instance.
+    fn name(&self) -> &str;
 
     /// Dimensionality of the vectors this codec instance accepts.
     fn dimension(&self) -> usize;
@@ -139,14 +141,35 @@ pub trait Codec: Send + Sync + std::fmt::Debug {
 
     /// Serialised learned parameters, empty for stateless codecs.
     ///
-    /// Restored with [`codec_with_params`]. Stored once per collection, so the
-    /// bytes are not counted in [`Codec::encoded_size`].
+    /// Restored with [`Codec::restore`] through [`codec_with_params`]. Stored
+    /// once per collection, so the bytes are not counted in
+    /// [`Codec::encoded_size`].
     fn params(&self) -> Vec<u8> {
         Vec::new()
+    }
+
+    /// Restore the parameters a fitted instance produced with [`Codec::params`].
+    ///
+    /// Stateless codecs reject any non-empty blob.
+    fn restore(&mut self, params: &[u8]) -> Result<(), CodecError> {
+        if params.is_empty() {
+            Ok(())
+        } else {
+            Err(CodecError::BadParams {
+                codec: self.name().to_owned(),
+                reason: format!("{} bytes of parameters for a stateless codec", params.len()),
+            })
+        }
     }
 }
 
 /// Instantiate a codec by its stable name, unfitted.
+///
+/// Names: `f32`, `int8`, `binary`, `binary-centred`, `pq<m>` (product
+/// quantization with `m` subspaces; bare `pq` means one byte per 8
+/// dimensions), `mrl<k>` (keep the first `k` dimensions, Matryoshka style)
+/// and `mrl<k>+<codec>` (truncate, then encode with another codec, for
+/// example `mrl256+int8` or `mrl128+pq16`).
 ///
 /// Trained codecs (see [`Codec::needs_fit`]) come back needing a [`Codec::fit`]
 /// call; use [`codec_with_params`] to restore one that was fitted earlier.
@@ -156,7 +179,32 @@ pub fn codec_by_name(name: &str, dimension: usize) -> Result<Box<dyn Codec>, Cod
         "int8" => Ok(Box::new(codecs::Int8Codec::new(dimension))),
         "binary" => Ok(Box::new(codecs::BinaryCodec::new(dimension))),
         "binary-centred" => Ok(Box::new(codecs::BinaryCentredCodec::new(dimension))),
-        other => Err(CodecError::UnknownCodec(other.to_owned())),
+        _ => {
+            if let Some(rest) = name.strip_prefix("pq") {
+                let m = parse_param(name, rest, Some(dimension / 8))?;
+                return Ok(Box::new(codecs::PqCodec::new(dimension, m)?));
+            }
+            if let Some(rest) = name.strip_prefix("mrl") {
+                let (keep, inner) = match rest.split_once('+') {
+                    Some((k, inner)) => (k, inner),
+                    None => (rest, "f32"),
+                };
+                let keep = parse_param(name, keep, None)?;
+                let inner = codec_by_name(inner, keep.min(dimension))?;
+                return Ok(Box::new(codecs::TruncateCodec::new(dimension, keep, inner)?));
+            }
+            Err(CodecError::UnknownCodec(name.to_owned()))
+        }
+    }
+}
+
+fn parse_param(name: &str, text: &str, default: Option<usize>) -> Result<usize, CodecError> {
+    match (text.is_empty(), default) {
+        (true, Some(d)) => Ok(d),
+        (true, None) => Err(CodecError::UnknownCodec(name.to_owned())),
+        (false, _) => text
+            .parse::<usize>()
+            .map_err(|_| CodecError::UnknownCodec(name.to_owned())),
     }
 }
 
@@ -166,24 +214,37 @@ pub fn codec_by_name(name: &str, dimension: usize) -> Result<Box<dyn Codec>, Cod
 /// for stateless codecs. Non-empty parameters for a stateless codec are an
 /// error, as is an empty blob for a codec that needs one.
 pub fn codec_with_params(name: &str, dimension: usize, params: &[u8]) -> Result<Box<dyn Codec>, CodecError> {
-    match name {
-        "binary-centred" => Ok(Box::new(codecs::BinaryCentredCodec::from_params(dimension, params)?)),
-        _ => {
-            let codec = codec_by_name(name, dimension)?;
-            if params.is_empty() {
-                Ok(codec)
-            } else {
-                Err(CodecError::BadParams {
-                    codec: name.to_owned(),
-                    reason: format!("{} bytes of parameters for a stateless codec", params.len()),
-                })
-            }
+    let mut codec = codec_by_name(name, dimension)?;
+    if codec.needs_fit() {
+        if params.is_empty() {
+            return Err(CodecError::BadParams {
+                codec: name.to_owned(),
+                reason: "no stored parameters for a trained codec".to_owned(),
+            });
         }
+        codec.restore(params)?;
+        Ok(codec)
+    } else if params.is_empty() {
+        Ok(codec)
+    } else {
+        Err(CodecError::BadParams {
+            codec: name.to_owned(),
+            reason: format!("{} bytes of parameters for a stateless codec", params.len()),
+        })
     }
 }
 
-/// Names of every codec this build knows about.
+/// Names of every codec family this build knows about. `pq` and `mrl` take
+/// parameters in the name; see [`codec_by_name`].
 #[must_use]
 pub fn codec_names() -> &'static [&'static str] {
-    &["f32", "int8", "binary", "binary-centred"]
+    &[
+        "f32",
+        "int8",
+        "binary",
+        "binary-centred",
+        "pq<m>",
+        "mrl<k>",
+        "mrl<k>+<codec>",
+    ]
 }

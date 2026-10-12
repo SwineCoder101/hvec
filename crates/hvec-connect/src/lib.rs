@@ -10,6 +10,7 @@ pub mod hash;
 #[cfg(feature = "local")]
 pub mod local;
 pub mod openai;
+pub mod prefix;
 pub mod traits;
 
 pub use config::{ChatProfile, ChatProvider, Config, EmbedProfile, EmbedProvider};
@@ -28,8 +29,23 @@ pub fn chat_model(config: &Config, profile_name: &str) -> Result<Arc<dyn ChatMod
     Ok(model)
 }
 
-/// Build an embedder from a named profile in the config.
+/// Build an embedder from a named profile in the config. Profiles with a
+/// `query_prefix` or `document_prefix` come back wrapped so that
+/// [`Embedder::embed_queries`] and [`Embedder::embed_documents`] apply them.
 pub async fn embedder(config: &Config, profile_name: &str) -> Result<Arc<dyn Embedder>> {
+    let profile = config.embed_profile(profile_name)?;
+    let raw = raw_embedder(config, profile_name).await?;
+    if profile.query_prefix.is_none() && profile.document_prefix.is_none() {
+        return Ok(raw);
+    }
+    Ok(Arc::new(prefix::PrefixedEmbedder::new(
+        raw,
+        profile.query_prefix.as_deref(),
+        profile.document_prefix.as_deref(),
+    )))
+}
+
+async fn raw_embedder(config: &Config, profile_name: &str) -> Result<Arc<dyn Embedder>> {
     let profile = config.embed_profile(profile_name)?;
     let embedder: Arc<dyn Embedder> = match profile.provider {
         EmbedProvider::Openai => Arc::new(openai::OpenAiEmbedder::from_profile(profile_name, profile).await?),

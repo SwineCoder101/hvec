@@ -5,9 +5,15 @@
 //! approximate the reference distance on the original f32 vector within the
 //! codec's documented error model.
 
+mod pq;
+mod truncate;
+
+pub use pq::PqCodec;
+pub use truncate::TruncateCodec;
+
 use crate::{Codec, CodecError, Encoded, Metric, Vector, distance};
 
-fn check_dim(expected: usize, got: usize) -> Result<(), CodecError> {
+pub(crate) fn check_dim(expected: usize, got: usize) -> Result<(), CodecError> {
     if got == expected {
         Ok(())
     } else {
@@ -15,7 +21,7 @@ fn check_dim(expected: usize, got: usize) -> Result<(), CodecError> {
     }
 }
 
-fn check_payload(expected: usize, got: usize) -> Result<(), CodecError> {
+pub(crate) fn check_payload(expected: usize, got: usize) -> Result<(), CodecError> {
     if got == expected {
         Ok(())
     } else {
@@ -44,7 +50,7 @@ impl F32Codec {
 }
 
 impl Codec for F32Codec {
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "f32"
     }
 
@@ -116,7 +122,7 @@ impl Int8Codec {
 }
 
 impl Codec for Int8Codec {
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "int8"
     }
 
@@ -222,7 +228,7 @@ impl BinaryCodec {
 }
 
 impl Codec for BinaryCodec {
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "binary"
     }
 
@@ -391,7 +397,7 @@ impl Centring {
 }
 
 impl Codec for BinaryCentredCodec {
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "binary-centred"
     }
 
@@ -447,6 +453,11 @@ impl Codec for BinaryCentredCodec {
                 .flat_map(|v| v.to_le_bytes())
                 .collect(),
         }
+    }
+
+    fn restore(&mut self, params: &[u8]) -> Result<(), CodecError> {
+        *self = Self::from_params(self.dimension, params)?;
+        Ok(())
     }
 
     fn encode(&self, vector: &[f32]) -> Result<Encoded, CodecError> {
@@ -812,14 +823,29 @@ mod tests {
 
     #[test]
     fn codec_registry_knows_every_codec() {
-        for name in crate::codec_names() {
+        for (name, trained) in [
+            ("f32", false),
+            ("int8", false),
+            ("binary", false),
+            ("binary-centred", true),
+            ("pq4", true),
+            ("pq", true),
+            ("mrl16", false),
+            ("mrl16+int8", false),
+            ("mrl16+binary-centred", true),
+            ("mrl8+pq2", true),
+        ] {
             let c = crate::codec_by_name(name, 32).unwrap();
-            assert_eq!(c.name(), *name);
-            assert_eq!(c.needs_fit(), *name == "binary-centred");
+            assert_eq!(c.needs_fit(), trained, "{name}");
+            // The name round-trips through the registry.
+            assert_eq!(crate::codec_by_name(c.name(), 32).unwrap().name(), c.name(), "{name}");
         }
-        assert!(matches!(
-            crate::codec_by_name("pq", 32),
-            Err(CodecError::UnknownCodec(_))
-        ));
+        assert_eq!(crate::codec_by_name("pq", 32).unwrap().name(), "pq4");
+        assert_eq!(crate::codec_by_name("mrl16", 32).unwrap().name(), "mrl16");
+        assert_eq!(crate::codec_by_name("mrl16+f32", 32).unwrap().name(), "mrl16");
+        for bad in ["pqx", "pq0", "pq7", "mrl", "mrl0", "mrl40", "mrl16+nope", "opq8"] {
+            assert!(crate::codec_by_name(bad, 32).is_err(), "{bad} should be rejected");
+        }
+        assert!(crate::codec_names().contains(&"pq<m>"));
     }
 }

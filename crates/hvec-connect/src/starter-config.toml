@@ -66,6 +66,10 @@ provider = "openai"
 model = "nomic-embed-text"
 base_url = "http://localhost:11434/v1"
 dimension = 768
+# Models trained with task prefixes need them on both sides. nomic-embed uses these two;
+# E5 uses "query: " and "passage: ". Leave unset for bge-small and MiniLM.
+query_prefix = "search_query: "
+document_prefix = "search_document: "
 
 # Deterministic word-hashing vectors with no semantics. Only for tests, CI and
 # smoke-testing the pipeline without a model download. Never for a benchmark.

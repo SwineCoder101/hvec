@@ -302,7 +302,7 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
             let qs = questions::load(path)?;
             let texts: Vec<String> = qs.iter().map(|q| q.retrieval_text().to_owned()).collect();
             let embedder = hvec_connect::embedder(&ctx.config, &collection.embed_profile).await?;
-            let vectors = embedder.embed(&texts).await?;
+            let vectors = embedder.embed_queries(&texts).await?;
             let labelled = qs.iter().filter(|q| !q.relevant.is_empty()).count();
             let queries: Vec<RecallQuery> = vectors
                 .into_iter()
@@ -337,7 +337,7 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
             }
             let embedder = hvec_connect::embedder(&ctx.config, &collection.embed_profile).await?;
             let qs = embedder
-                .embed(&lines)
+                .embed_queries(&lines)
                 .await?
                 .into_iter()
                 .map(|vector| RecallQuery {

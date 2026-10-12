@@ -278,7 +278,7 @@ pub struct IngestArgs {
     /// Embedding profile. Defaults to `default_embedder` in config.
     #[arg(short, long)]
     pub embedder: Option<String>,
-    /// Codec used to store vectors: f32, int8, binary or binary-centred.
+    /// Codec used to store vectors: f32, int8, binary, binary-centred, pq<m>, mrl<k> or mrl<k>+<codec>.
     #[arg(long, default_value = "f32")]
     pub codec: String,
     /// Words per chunk.
