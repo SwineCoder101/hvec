@@ -1003,3 +1003,98 @@ fn embedding_prefixes_apply_to_documents_and_queries() {
         q["metrics"]["retrieved"][0]["score"]
     );
 }
+
+#[test]
+fn payload_stage_shrinks_the_prompt_and_is_recorded() {
+    let env = Env::new();
+    ingest_two_docs(&env);
+
+    // Truncation keeps the first words of each passage; the model sees the short version.
+    let out = env.run(&[
+        "query",
+        "refund?",
+        "--collection",
+        "docs",
+        "-k",
+        "2",
+        "--payload",
+        "truncate:4",
+        "--json",
+    ]);
+    assert_ok(&out, "query truncate");
+    let row: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(row["metadata"]["payload"], "truncate:4");
+    let m = &row["metrics"];
+    assert_eq!(m["context_words_after"], 8);
+    assert!(m["context_words_before"].as_u64().unwrap() > 8, "{m}");
+    assert!(m["context_chars_after"].as_u64().unwrap() < m["context_chars_before"].as_u64().unwrap());
+    let sent = env.server.anthropic_requests().pop().unwrap();
+    let user = sent.body["messages"][0]["content"].as_str().unwrap();
+    assert!(
+        user.contains("[1] (source: ") && user.contains("Refund policy. Customers may\n"),
+        "{user}"
+    );
+    assert!(!user.contains("original payment method"), "{user}");
+
+    // An external compressor over HTTP; the mock keeps three words and marks the cut.
+    let url = format!("http:{}/compress", env.server.base_url);
+    let out = env.run(&[
+        "query",
+        "shipping?",
+        "--collection",
+        "docs",
+        "-k",
+        "1",
+        "--payload",
+        &url,
+        "--json",
+    ]);
+    assert_ok(&out, "query http payload");
+    let row: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(row["metadata"]["payload"], url);
+    assert_eq!(row["metrics"]["context_words_after"], 4);
+    let compress = env
+        .server
+        .requests()
+        .into_iter()
+        .find(|r| r.path.ends_with("/compress"))
+        .unwrap();
+    assert_eq!(compress.body["question"], "shipping?");
+    assert_eq!(compress.body["passages"].as_array().unwrap().len(), 1);
+    let user = env.server.anthropic_requests().pop().unwrap().body["messages"][0]["content"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(user.contains("Shipping policy. Orders …"), "{user}");
+
+    // A bench run records the stage on every row and the report keys cells by it.
+    let qs = env.write_doc(
+        "p.jsonl",
+        "{\"id\":\"q1\",\"question\":\"refund window? say exactly thirty days\",\"answers\":[\"thirty days\"]}\n",
+    );
+    for p in ["none", "truncate:5"] {
+        assert_ok(
+            &env.run(&[
+                "bench",
+                "run",
+                "--questions",
+                qs.to_str().unwrap(),
+                "--collections",
+                "docs",
+                "--payload",
+                p,
+            ]),
+            "bench run",
+        );
+    }
+    let out = env.run(&["report", "--json"]);
+    assert_ok(&out, "report");
+    let cells: Vec<serde_json::Value> = serde_json::from_str(&stdout(&out)).unwrap();
+    let payloads: Vec<&str> = cells.iter().map(|c| c["key"]["payload"].as_str().unwrap()).collect();
+    assert_eq!(payloads, ["none", "truncate:5"]);
+    assert!(stdout(&env.run(&["report"])).contains("truncate:5"));
+
+    let bad = env.run(&["query", "x", "--collection", "docs", "--payload", "zip"]);
+    assert!(!bad.status.success());
+    assert!(stderr(&bad).contains("unknown payload stage"), "{}", stderr(&bad));
+}

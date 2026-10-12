@@ -342,6 +342,7 @@ impl Shell {
                     codec,
                     embedder,
                     chat: Arc::clone(&chat),
+                    payload: hvec_bench::payload::Payload::None,
                 };
                 let outcome = self.handle.block_on(pipeline.answer(history, question, self.k))?;
                 if self.show_context {
@@ -360,6 +361,7 @@ impl Shell {
                     m.output_tokens
                 );
                 let record = QueryRecord {
+                    payload: "none".to_owned(),
                     kind: "chat",
                     collection: collection.name.clone(),
                     chat_profile: self.chat_name.clone(),

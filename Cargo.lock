@@ -1203,6 +1203,7 @@ dependencies = [
  "hvec-connect",
  "hvec-core",
  "hvec-store",
+ "reqwest 0.13.5",
  "rustyline",
  "serde",
  "serde_json",

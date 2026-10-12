@@ -13,6 +13,8 @@ pub struct CellKey {
     pub embed_model: String,
     pub codec: String,
     pub chat_model: String,
+    /// Payload stage; `none` for runs recorded before the stage existed.
+    pub payload: String,
 }
 
 /// Aggregated outcome for one cell.
@@ -66,6 +68,7 @@ pub fn aggregate(rows: &[RunRow]) -> Vec<Cell> {
             embed_model: r.embed_model.clone().unwrap_or_else(|| "-".into()),
             codec: r.codec.clone().unwrap_or_else(|| "-".into()),
             chat_model: r.chat_model.clone().unwrap_or_else(|| "-".into()),
+            payload: r.metadata["payload"].as_str().unwrap_or("none").to_owned(),
         };
         groups.entry(key).or_default().push(r);
     }
@@ -180,6 +183,18 @@ mod tests {
         assert_eq!(f32.scored, 2);
         assert_eq!(f32.judged, 0);
         assert_eq!(f32.judge_correct, None);
+        assert_eq!(f32.key.payload, "none");
+    }
+
+    #[test]
+    fn payload_splits_cells() {
+        let a = row("qa", "f32", "opus", true, true, None, 1);
+        let mut b = row("qa", "f32", "opus", true, true, None, 1);
+        b.metadata["payload"] = serde_json::json!("truncate:40");
+        let cells = aggregate(&[a, b]);
+        assert_eq!(cells.len(), 2);
+        assert_eq!(cells[0].key.payload, "none");
+        assert_eq!(cells[1].key.payload, "truncate:40");
     }
 
     #[test]

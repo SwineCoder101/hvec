@@ -18,6 +18,7 @@ fn query_record_round_trips_through_store() {
         codec: "f32".into(),
         metric: "cosine".into(),
         session: None,
+        payload: "none".into(),
         question: "q?".into(),
         answer: "a.".into(),
         stop_reason: Some("end_turn".into()),
@@ -34,6 +35,11 @@ fn query_record_round_trips_through_store() {
                 ordinal: 2,
                 score: 0.81,
             }],
+            payload_ms: 0,
+            context_chars_before: 10,
+            context_chars_after: 10,
+            context_words_before: 2,
+            context_words_after: 2,
         },
     };
     let row = record.into_row();
@@ -48,4 +54,11 @@ fn query_record_round_trips_through_store() {
     let m: QueryMetrics = serde_json::from_value(back.metrics).unwrap();
     assert_eq!(m.k, 3);
     assert_eq!(m.retrieved[0].chunk_id, 7);
+    assert_eq!(back.metadata["payload"], "none");
+    // Rows written before the payload stage existed still deserialise.
+    let old: QueryMetrics = serde_json::from_str(
+        r#"{"k":1,"embed_ms":0,"retrieval_ms":0,"generation_ms":0,"input_tokens":0,"output_tokens":0,"retrieved":[]}"#,
+    )
+    .unwrap();
+    assert_eq!(old.payload_ms, 0);
 }

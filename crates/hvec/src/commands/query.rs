@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use hvec_bench::QueryRecord;
+use hvec_bench::payload::Payload;
 
 use crate::cli::QueryArgs;
 use crate::commands::rag;
@@ -16,6 +17,7 @@ pub async fn run(config: &Option<PathBuf>, args: QueryArgs) -> Result<()> {
     let embedder = hvec_connect::embedder(&ctx.config, &collection.embed_profile).await?;
     let chat = hvec_connect::chat_model(&ctx.config, &chat_name)?;
     let codec = collection.codec()?;
+    let payload = Payload::parse(&args.payload)?;
 
     let pipeline = rag::Pipeline {
         store: &store,
@@ -23,6 +25,7 @@ pub async fn run(config: &Option<PathBuf>, args: QueryArgs) -> Result<()> {
         codec: codec.as_ref(),
         embedder,
         chat: chat.clone(),
+        payload: payload.clone(),
     };
     let outcome = pipeline.answer(Vec::new(), &args.question, args.k).await?;
 
@@ -38,6 +41,7 @@ pub async fn run(config: &Option<PathBuf>, args: QueryArgs) -> Result<()> {
         codec: collection.codec.clone(),
         metric: collection.metric.name().to_owned(),
         session: None,
+        payload: payload.name(),
         question: args.question.clone(),
         answer: outcome.response.text.clone(),
         stop_reason: outcome.response.stop_reason.clone(),
@@ -53,17 +57,19 @@ pub async fn run(config: &Option<PathBuf>, args: QueryArgs) -> Result<()> {
         return Ok(());
     }
     if args.show_context {
-        rag::print_context(&outcome.hits);
+        rag::print_context(&outcome.sent);
     }
     println!("{}", outcome.response.text.trim());
     let m = &outcome.metrics;
     eprintln!(
-        "\n[{} | {} | k={} | embed {}ms, retrieve {}ms, generate {}ms | {} in / {} out tokens{}]",
+        "\n[{} | {} | payload {} | k={} | embed {}ms, retrieve {}ms, payload {}ms, generate {}ms | {} in / {} out tokens{}]",
         outcome.response.model,
         collection.codec,
+        payload.name(),
         m.k,
         m.embed_ms,
         m.retrieval_ms,
+        m.payload_ms,
         m.generation_ms,
         m.input_tokens,
         m.output_tokens,

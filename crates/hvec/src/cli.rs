@@ -173,6 +173,9 @@ pub struct BenchRunArgs {
     /// Passages to retrieve per question.
     #[arg(short, long, default_value_t = 5)]
     pub k: usize,
+    /// Payload stage between retrieval and the prompt: none, truncate:<words> or http:<url>.
+    #[arg(long, default_value = "none")]
+    pub payload: String,
     /// Only the first N questions.
     #[arg(long)]
     pub limit: Option<usize>,
@@ -308,7 +311,10 @@ pub struct QueryArgs {
     /// Number of passages to retrieve.
     #[arg(short, long, default_value_t = 5)]
     pub k: usize,
-    /// Print the retrieved passages before the answer.
+    /// Payload stage between retrieval and the prompt: none, truncate:<words> or http:<url>.
+    #[arg(long, default_value = "none")]
+    pub payload: String,
+    /// Print the passages as sent to the model, before the answer.
     #[arg(long)]
     pub show_context: bool,
     /// Do not write this run to the run log.

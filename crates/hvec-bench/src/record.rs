@@ -35,6 +35,18 @@ pub struct QueryMetrics {
     pub input_tokens: u64,
     pub output_tokens: u64,
     pub retrieved: Vec<RetrievedChunk>,
+    /// Time spent in the payload stage, zero for `none`.
+    #[serde(default)]
+    pub payload_ms: u64,
+    /// Context size before and after the payload stage.
+    #[serde(default)]
+    pub context_chars_before: usize,
+    #[serde(default)]
+    pub context_chars_after: usize,
+    #[serde(default)]
+    pub context_words_before: usize,
+    #[serde(default)]
+    pub context_words_after: usize,
 }
 
 /// Setup and outcome of one query, ready to be written as a `RunRow`.
@@ -51,6 +63,8 @@ pub struct QueryRecord {
     pub codec: String,
     pub metric: String,
     pub session: Option<String>,
+    /// Payload stage name, `none` when passages were sent as retrieved.
+    pub payload: String,
     pub question: String,
     pub answer: String,
     pub stop_reason: Option<String>,
@@ -75,6 +89,7 @@ impl QueryRecord {
             "chat_model_configured": self.chat_model_configured,
             "dimension": self.dimension,
             "session": self.session,
+            "payload": self.payload,
             "question": self.question,
             "answer": self.answer,
             "stop_reason": self.stop_reason,

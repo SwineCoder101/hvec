@@ -8,6 +8,7 @@ use hvec_store::RunRow;
 
 use std::sync::Arc;
 
+use hvec_bench::payload::Payload;
 use hvec_bench::questions::{self, Question};
 use hvec_bench::report::{self as rpt, Cell};
 use hvec_connect::{ChatModel, Embedder};
@@ -42,6 +43,7 @@ async fn run_cmd(config: &Option<PathBuf>, args: BenchRunArgs) -> Result<()> {
         args.chat.clone()
     };
     let batch = uuid_short();
+    let payload = Payload::parse(&args.payload)?;
 
     // Resolve everything up front so a typo fails before any model is called.
     let collections = args
@@ -65,11 +67,12 @@ async fn run_cmd(config: &Option<PathBuf>, args: BenchRunArgs) -> Result<()> {
 
     let total = qs.len() * collections.len() * chats.len();
     eprintln!(
-        "batch {batch}: {} questions × {} collections × {} chat profiles = {total} runs (k={})",
+        "batch {batch}: {} questions × {} collections × {} chat profiles = {total} runs (k={}, payload {})",
         qs.len(),
         collections.len(),
         chats.len(),
-        args.k
+        args.k,
+        payload.name()
     );
 
     let mut done = 0usize;
@@ -84,6 +87,7 @@ async fn run_cmd(config: &Option<PathBuf>, args: BenchRunArgs) -> Result<()> {
                 codec: codec.as_ref(),
                 embedder: Arc::clone(&embedder),
                 chat: Arc::clone(chat),
+                payload: payload.clone(),
             };
             for q in &qs {
                 done += 1;
@@ -108,6 +112,7 @@ async fn run_cmd(config: &Option<PathBuf>, args: BenchRunArgs) -> Result<()> {
                     "prompt_version": hvec_bench::prompt::PROMPT_VERSION,
                     "dimension": collection.dimension,
                     "k": args.k,
+                    "payload": payload.name(),
                 });
 
                 match pipeline
@@ -201,12 +206,13 @@ fn print_cells(cells: &[Cell]) {
     let judged = cells.iter().any(|c| c.judged > 0);
     let opt = |v: Option<f64>| v.map_or("-".to_owned(), |v| format!("{v:.3}"));
     println!(
-        "{:<12} {:<18} {:<26} {:<15} {:<24} {:>4} {:>5} {:>6} {:>8} {:>7} {:>6}{} {:>7} {:>7} {:>6} {:>6} {:>4}",
+        "{:<12} {:<18} {:<26} {:<15} {:<24} {:<12} {:>4} {:>5} {:>6} {:>8} {:>7} {:>6}{} {:>7} {:>7} {:>6} {:>6} {:>4}",
         "set",
         "collection",
         "embed model",
         "codec",
         "chat model",
+        "payload",
         "n",
         "gold",
         "exact",
@@ -223,12 +229,13 @@ fn print_cells(cells: &[Cell]) {
     for c in cells {
         let embed = c.key.embed_model.rsplit('/').next().unwrap_or(&c.key.embed_model);
         println!(
-            "{:<12} {:<18} {:<26} {:<15} {:<24} {:>4} {:>5} {:>6.3} {:>8.3} {:>7} {:>6}{} {:>7.0} {:>7.0} {:>6.0} {:>6.0} {:>4}",
+            "{:<12} {:<18} {:<26} {:<15} {:<24} {:<12} {:>4} {:>5} {:>6.3} {:>8.3} {:>7} {:>6}{} {:>7.0} {:>7.0} {:>6.0} {:>6.0} {:>4}",
             trunc(&c.key.question_set, 12),
             trunc(&c.key.collection, 18),
             trunc(embed, 26),
             c.key.codec,
             trunc(&c.key.chat_model, 24),
+            trunc(&c.key.payload, 12),
             c.n,
             c.scored,
             c.exact,

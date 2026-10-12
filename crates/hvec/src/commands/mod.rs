@@ -12,14 +12,18 @@ pub mod rag {
     use std::sync::Arc;
     use std::time::Instant;
 
-    use anyhow::Result;
+    use anyhow::{Context as _, Result};
+    use hvec_bench::payload::{self, Payload, PayloadStats};
     use hvec_bench::{QueryMetrics, RAG_SYSTEM_PROMPT, RetrievedChunk, build_user_prompt};
     use hvec_connect::{ChatModel, ChatRequest, ChatResponse, Embedder, Message};
     use hvec_core::Codec;
     use hvec_store::{Collection, Hit, Store};
 
     pub struct TurnOutcome {
+        /// The passages as retrieved, before the payload stage.
         pub hits: Vec<Hit>,
+        /// The passages as sent to the model.
+        pub sent: Vec<Hit>,
         pub response: ChatResponse,
         pub metrics: QueryMetrics,
     }
@@ -31,6 +35,34 @@ pub mod rag {
         pub codec: &'a dyn Codec,
         pub embedder: Arc<dyn Embedder>,
         pub chat: Arc<dyn ChatModel>,
+        pub payload: Payload,
+    }
+
+    /// Run the payload stage over the retrieved passages.
+    pub async fn apply_payload(stage: &Payload, question: &str, hits: &[Hit]) -> Result<Vec<Hit>> {
+        match stage {
+            Payload::Http { url } => {
+                let body = payload::HttpRequest::new(question, hits);
+                let resp = reqwest::Client::new()
+                    .post(url)
+                    .json(&body)
+                    .send()
+                    .await
+                    .with_context(|| format!("payload compressor at {url}"))?;
+                let status = resp.status();
+                let text = resp
+                    .text()
+                    .await
+                    .with_context(|| format!("payload compressor at {url}"))?;
+                if !status.is_success() {
+                    anyhow::bail!("payload compressor at {url} returned {status}: {text}");
+                }
+                let parsed: payload::HttpResponse =
+                    serde_json::from_str(&text).with_context(|| format!("payload compressor reply: {text}"))?;
+                payload::apply_response(hits, parsed).map_err(|e| anyhow::anyhow!(e))
+            }
+            local => Ok(payload::apply_local(local, hits)),
+        }
     }
 
     impl Pipeline<'_> {
@@ -64,8 +96,13 @@ pub mod rag {
                 .search(&self.collection.name, &query, k, self.codec, self.collection.metric)?;
             let retrieval_ms = t.elapsed().as_millis() as u64;
 
+            let t = Instant::now();
+            let sent = apply_payload(&self.payload, question, &hits).await?;
+            let payload_ms = t.elapsed().as_millis() as u64;
+            let stats = PayloadStats::measure(&hits, &sent);
+
             let mut messages = history;
-            messages.push(Message::user(build_user_prompt(&hits, question)));
+            messages.push(Message::user(build_user_prompt(&sent, question)));
 
             let t = Instant::now();
             let response = self
@@ -86,9 +123,15 @@ pub mod rag {
                 input_tokens: response.usage.input_tokens,
                 output_tokens: response.usage.output_tokens,
                 retrieved: hits.iter().map(RetrievedChunk::from).collect(),
+                payload_ms,
+                context_chars_before: stats.context_chars_before,
+                context_chars_after: stats.context_chars_after,
+                context_words_before: stats.context_words_before,
+                context_words_after: stats.context_words_after,
             };
             Ok(TurnOutcome {
                 hits,
+                sent,
                 response,
                 metrics,
             })

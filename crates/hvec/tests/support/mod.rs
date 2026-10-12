@@ -135,6 +135,21 @@ fn handle(mut stream: TcpStream, log: &Mutex<Vec<Recorded>>) {
                 "usage": {"prompt_tokens": 45, "completion_tokens": 6}
             }),
         )
+    } else if path.ends_with("/compress") {
+        // A payload compressor: keeps the first three words of each passage.
+        let passages: Vec<serde_json::Value> = body["passages"]
+            .as_array()
+            .map(|ps| {
+                ps.iter()
+                    .map(|p| {
+                        let text = p["text"].as_str().unwrap_or("");
+                        let short = text.split_whitespace().take(3).collect::<Vec<_>>().join(" ");
+                        serde_json::json!({"source": p["source"], "ordinal": p["ordinal"], "text": format!("{short} …")})
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        (200, serde_json::json!({"passages": passages}))
     } else {
         (404, serde_json::json!({"error": "no route"}))
     };
