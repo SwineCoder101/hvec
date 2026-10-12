@@ -8,10 +8,13 @@ Blog and experiment write-ups: [swinecoder101.github.io/hvec](https://swinecoder
   <img src="docs/assets/homomorphic-compression.svg" width="960" alt="Animated diagram: documents and agent memory are embedded as f32 vectors, compressed by a codec into small codes, scored against an uncompressed query directly on the codes with no decode step, and the top passages flow into an agent's context window; the agent writes new memory back into the loop.">
 </p>
 
-> Status: early experimental. Phases 1 to 3 are in place: shell and CLI, model connectors, f32,
-> int8 and binary codecs, `bench recall`, question sets, `bench run` across the matrix and
-> `report`. The first retrieval experiment is published; the first answer-level experiment needs
-> API access. Expect APIs and results to change without notice. Contributions and experiments are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+> Status: early experimental. The tooling for phases 1 to 6 is in place: shell and CLI, model
+> connectors, seven codec families (`f32`, `int8`, `binary`, `binary-centred`, `pq<m>`, `mrl<k>`
+> and `mrl<k>+<codec>`), `bench recall` against the f32 ranking and against relevance judgments, a
+> BEIR importer, `bench run` across the matrix with a payload stage, `report`, an LLM judge and an
+> agent memory-loop benchmark. Four retrieval experiments are published. The answer-level
+> experiments (two chat models) are scripted and waiting on API access. Expect APIs and results to
+> change without notice. Contributions and experiments are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## What is homomorphic compression?
 
@@ -37,7 +40,8 @@ Familiar techniques already sit on this spectrum, even if they are rarely named 
 | Scalar / int8 quantization (`int8` in hvec) | Approximate dot product | Small loss, ~4x smaller |
 | Binary / 1-bit quantization (`binary` in hvec) | Sign agreement as a proxy | Large loss, ~32x smaller |
 | Mean-centred binary (`binary-centred` in hvec) | Sign agreement after subtracting the corpus mean | Same size as binary; the loss depends on how centred the model's vectors are |
-| Product quantization (PQ) with asymmetric distance | Table-lookup distance | Tunable loss, 8-64x smaller |
+| Product quantization (`pq<m>` in hvec) | Per-subspace centroid distance, summed | Tunable loss, 8-64x smaller; needs trained codebooks |
+| Matryoshka truncation (`mrl<k>` in hvec, composable as `mrl<k>+int8`) | The metric on a prefix of the vector | Near-free on models trained for it, a plain lossy projection otherwise |
 | Random projections / JL sketches | Approximate inner product | Provable error bounds |
 | Homomorphic encryption (CKKS and friends) | Exact ops on ciphertext | Privacy, heavy compute |
 
@@ -58,14 +62,15 @@ Two kinds of compression touch a retrieval-augmented agent, and they are easy to
 | Where it acts | Inside the vector store, before retrieval | Between retrieval and the model, in the prompt |
 | What it changes | Which passages come back | How many tokens the model sees |
 | Example | int8, binary, product quantization | [Headroom](https://github.com/headroomlabs-ai/headroom), LLMLingua, summarisation |
-| hvec's role | **Implements and measures it** | **Measures it as a stage in the pipeline** (roadmap) |
+| hvec's role | **Implements and measures it** | **Measures it as a stage in the pipeline** (`--payload`) |
 
 Headroom and tools like it are production layers that save tokens. hvec is a measurement
 harness. It does not sit in your request path and it does not make anything cheaper by itself.
 It answers a question those tools cannot answer about themselves: for a given embedding model,
 codec, payload compressor and chat model, did the answers change, and by how much. The two are
-complementary. A Headroom-style stage is a planned axis of the hvec benchmark matrix, so the
-combined effect of compressing the key and the payload can be measured in one run log.
+complementary. A Headroom-style stage is an axis of the hvec benchmark matrix (`--payload
+http:<url>` hands the retrieved passages to a local compressor service), so the combined effect
+of compressing the key and the payload is measured in one run log.
 
 ## Goals
 
@@ -88,18 +93,18 @@ combined effect of compressing the key and the payload can be measured in one ru
 ```
 hvec/
 ├── crates/
-│   ├── hvec-core/      # Codec trait, Metric, distance kernels, f32 baseline codec
+│   ├── hvec-core/      # Codec trait, Metric, distance kernels, the codecs
 │   ├── hvec-connect/   # ChatModel + Embedder traits; Anthropic, OpenAI-compatible, local ONNX
 │   ├── hvec-store/     # SQLite: collections, compressed-domain search, sessions, run log
-│   ├── hvec-bench/     # Chunking, fixed RAG prompt, metrics, typed run records
+│   ├── hvec-bench/     # Chunking, prompts, question sets, BEIR import, metrics, judge, payload, memory
 │   └── hvec/           # The CLI
 ├── experiments/        # One directory per experiment with its write-up
+├── questions/          # Question sets and memory scripts
 ├── CONTRIBUTING.md
 └── README.md
 ```
 
-The benchmark is a matrix: **embedding model × codec × chat model × dataset**, with payload
-compression as a planned fifth axis. Compression behaviour depends on the embedding model
+The benchmark is a matrix: **embedding model × codec × payload stage × chat model × dataset**. Compression behaviour depends on the embedding model
 (dimension, distribution, normalisation). Tolerance to degraded retrieval depends on the chat
 model. hvec keeps every axis explicit in every run record.
 
@@ -199,9 +204,10 @@ hvec ingest docs/ notes.md --collection handbook
 
 Directories are walked recursively for `md`, `txt`, `markdown` and `rst` files (change with
 `--ext`). Text is split into overlapping word windows (`--chunk-words 200 --overlap-words 40`),
-embedded in batches, encoded with the chosen codec (`--codec f32` for now) and stored. The first
-run downloads the local embedding model to your cache directory. A collection remembers which
-embedding model built it and refuses to mix in another.
+embedded in batches, encoded with the chosen codec (`--codec int8`, `pq48`, `mrl256+int8`, …)
+and stored. The first run downloads the local embedding model to your cache directory. A
+collection remembers which embedding model built it and refuses to mix in another. Models trained
+with task prefixes (nomic-embed, E5) take `query_prefix` and `document_prefix` in their profile.
 
 ```sh
 hvec collections list
@@ -259,12 +265,29 @@ agreement, mean and maximum score error, bytes per vector, compression ratio, an
 time. Queries are stored vectors by default, each excluding itself, or lines from a file embedded
 with the collection's own embedder. Every codec's result is a `recall` row in the run log.
 
-Codecs come in two kinds. `f32`, `int8` and `binary` are stateless: a vector encodes the same way
-regardless of its neighbours. `binary-centred` is *trained*: it subtracts the corpus mean before
-taking sign bits, so it has to see the corpus first. `bench recall` fits it on the collection it
-is measuring. `ingest --codec binary-centred` fits it on the first ingest into a collection,
-stores the mean alongside the collection, and reuses it for every later ingest, so make the first
-call a representative sample of the corpus rather than a single file.
+Codecs come in two kinds. `f32`, `int8`, `binary` and `mrl<k>` are stateless: a vector encodes
+the same way regardless of its neighbours. `binary-centred` (subtract the corpus mean, then sign
+bits) and `pq<m>` (`m` subspaces, k-means codebooks of 256 centroids each, one byte per subspace)
+are *trained*: they have to see the corpus first. `bench recall` fits them on the collection it
+is measuring. `ingest --codec pq48` fits on the first ingest into a collection, stores the
+parameters alongside the collection, and reuses them for every later ingest, so make the first
+call a representative sample of the corpus rather than a single file. `mrl<k>` keeps the first
+`k` dimensions (what Matryoshka-trained models are built for) and composes with any other codec:
+`mrl256+int8`, `mrl128+pq16`.
+
+With a question set that carries relevance judgments, `bench recall --questions` also reports
+nDCG@k and document recall@k against the labels, for every codec and for the f32 ceiling:
+
+```sh
+hvec questions import-beir path/to/scifact --out questions/scifact.jsonl --corpus-out corpus/
+hvec ingest corpus/ --collection scifact --ext txt --chunk-words 200 --overlap-words 0
+hvec bench recall --collection scifact --questions questions/scifact.jsonl --codecs int8,binary,pq48
+```
+
+The importer reads a BEIR dataset directory (`corpus.jsonl`, `queries.jsonl`, `qrels/`), writes
+one `<id>.txt` per document so that chunks carry their document id, and turns every judged query
+into a question with a `relevant` list. For SciFact, `--scifact-claims claims_dev.jsonl` from the
+original release adds supports/refutes gold answers.
 
 Measured on BEIR SciFact (8,036 chunks, `bge-small-en-v1.5`, 384 dims, cosine, the 300 test
 claims as queries, k=10, release build):
@@ -282,10 +305,11 @@ score error below a thousandth. Binary loses four neighbours in ten on this embe
 its scores are far from the exact cosine because BGE vectors share a large common component, so
 most sign bits agree across the corpus. Centring fixes the scores (six times smaller error) but
 recovers only four or five points of recall: one bit per dimension cannot separate neighbours
-whose cosines differ by less than its resolution, whatever the origin is. Whether that loss
-reaches the answer is the phase 3 question. The f32 scan is slow only because the baseline
-decodes each vector; the other codecs score the bytes directly. Both experiments are written up
-under [`experiments/`](experiments/).
+whose cosines differ by less than its resolution, whatever the origin is. Against the human
+relevance judgments the picture is gentler: binary loses 4.4 points of nDCG@10 (0.698 to 0.654),
+not 39, because the neighbours it reorders are near-ties that are rarely the judged abstract.
+The f32 scan is slow only because the baseline decodes each vector; the other codecs score the
+bytes directly. The experiments are written up under [`experiments/`](experiments/).
 
 ### 7. Run the matrix and report
 
@@ -310,12 +334,55 @@ hvec report --set handbook --json
 
 Each question becomes one `bench` row per cell with the answer, the gold answers, two cheap
 scores (`exact`: normalised answer equals a gold answer; `contains`: normalised answer contains
-one) and, when the question names a `source`, whether retrieval returned a chunk from it. Model
-errors are recorded, counted and skipped rather than aborting the batch; `--fail-fast` reverses
-that. `report` groups rows by question set, collection, embedding model, codec and chat model and
-prints accuracy, source-hit rate, latency and tokens per cell, and flags runs that a provider
-served with a different model than configured. The scores are deliberately crude; an LLM judge
-is the next phase. See [questions/README.md](questions/README.md) for the file format.
+one) and, when the question names a `source` or a `relevant` list, whether retrieval hit it, plus
+nDCG and document recall for judged questions. Model errors are recorded, counted and skipped
+rather than aborting the batch; `--fail-fast` reverses that. `report` groups rows by question
+set, collection, embedding model, codec, payload stage and chat model and prints accuracy over
+the questions with gold answers, retrieval hit rate, nDCG, latency and tokens per cell, and flags
+runs that a provider served with a different model than configured. See
+[questions/README.md](questions/README.md) for the file format.
+
+### 8. Grade answers with a judge model
+
+```sh
+hvec judge run --batch 3f9a1c2e --judge anthropic-sonnet
+hvec judge agreement --batch 3f9a1c2e
+hvec report --batch 3f9a1c2e      # now with judged / faithful columns
+```
+
+The cheap scores miss paraphrases and accept substrings. `judge run` asks a second, cheaper
+model to grade every recorded answer twice: *correct* against the gold answers (null when the
+question has none) and *faithful* to the passages it was generated from, which are fetched back
+by chunk id. Verdicts are `judge` rows pointing at their bench run; the judge prompt is versioned
+like the RAG prompt. `judge agreement` reports how often the judge and the cheap rules agree, and
+counts the two kinds of disagreement, so the judge can be trusted (or not) before its numbers are
+used. Runs that already have a verdict are skipped unless `--rejudge`.
+
+### 9. Compress the payload too
+
+```sh
+hvec query "refund policy?" --collection handbook --payload truncate:60
+hvec bench run --questions questions/handbook.jsonl --collections hb-f32,hb-binary --payload http://localhost:8080/compress
+```
+
+The payload stage sits between retrieval and the prompt. `none` sends the passages as retrieved;
+`truncate:<words>` is the naive baseline; `http:<url>` POSTs `{"question", "passages": [{"source",
+"ordinal", "text"}]}` to a compressor running as a local service and expects the same passages
+back with their text replaced, which is a few lines of shim around Headroom or LLMLingua. Every
+run records the stage, its latency and the context size before and after it, and `report` keys
+cells by it, so key compression and payload compression can be crossed in one batch.
+
+### 10. Replay an agent's memory loop
+
+```sh
+hvec bench memory --script questions/memory-smoke.jsonl --codecs f32,int8,binary,pq48
+```
+
+An agent writes tool results and turns into its store far more often than it reads, and reads
+back what it wrote minutes ago. A memory script replays that: `write` steps append text to a
+fresh memory collection, `ask` steps retrieve from it and answer. The script runs once per codec
+and every step is a `memory` row with bytes stored, cumulative bytes, retrieval and generation
+latency, tokens and the answer scores, followed by a per-codec summary.
 
 ## Troubleshooting
 
@@ -351,12 +418,13 @@ See the experiment section of [CONTRIBUTING.md](CONTRIBUTING.md) for the templat
 cargo test --workspace
 ```
 
-Unit tests cover the codec, distance kernels, chunker, metrics, config and store. Integration
-tests in `crates/hvec/tests/` drive the real binary through ingest, query, chat, sessions and the
-run log against an in-process mock of the Anthropic and OpenAI APIs, using a deterministic
-word-hashing embedder so no model download or API key is needed. They assert the wire format of
-every request, the run-log contents, session persistence and refusal handling. CI runs them on
-every push.
+Unit tests cover the codecs, distance kernels, chunker, metrics, question sets, BEIR import,
+judge, payload stage, memory scripts, config and store. Integration tests in `crates/hvec/tests/`
+drive the real binary through ingest, query, chat, sessions, the benchmarks, the judge, the
+payload stage and the memory loop against an in-process mock of the Anthropic and OpenAI APIs
+(which also plays the judge and a payload compressor), using a deterministic word-hashing
+embedder so no model download or API key is needed. They assert the wire format of every request,
+the run-log contents, session persistence and refusal handling. CI runs them on every push.
 
 ## Contributing
 

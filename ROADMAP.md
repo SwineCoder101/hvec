@@ -26,52 +26,81 @@ integration tests, CI.
 
 Exit: a table of recall@10 and score error per codec for one embedding model, in the run log.
 
-## Phase 3 · Question sets and the matrix (tooling done, experiment pending)
+## Phase 3 · Question sets and the matrix (tooling done; Experiment 1 waiting on API access)
 
 - [x] JSONL question sets with gold answers (`questions/<name>.jsonl`): `question`, `answers`,
   optional `source` hint. Loader with validation.
 - [x] `hvec bench run --questions <set> --collections a,b,c --chat p,q`: one run per cell, with
   exact and contains scoring and source-hit recorded alongside timings and tokens. Errors are
   recorded and skipped; `--fail-fast` to abort.
-- [x] `hvec report`: group `bench` rows by question set, collection, embedding model, codec and
-  chat model; accuracy, source-hit rate, tokens and latency per cell; `--batch`, `--set`, `--json`.
-- [ ] A BEIR-style importer for question sets with relevance judgments.
-- [ ] **Experiment 1** (needs API access to two chat models).
+- [x] `hvec report`: group `bench` rows by question set, collection, embedding model, codec,
+  payload and chat model; accuracy, retrieval hit rate, nDCG, tokens and latency per cell;
+  `--batch`, `--set`, `--json`.
+- [x] A BEIR-style importer for question sets with relevance judgments:
+  `hvec questions import-beir`, the `relevant` and `query` fields, nDCG@k and document recall@k
+  in both `bench recall --questions` and `bench run`. The SciFact claim labels give 188 of the
+  300 test claims a supports/refutes gold answer.
+- [x] Measure the existing codecs against the judgments rather than against f32:
+  [SciFact, codecs against the relevance judgments](experiments/2026-10-scifact-labelled/).
+  Binary loses 39 points of f32 agreement but 4 points of nDCG@10.
+- [ ] **Experiment 1** (needs API access to two chat models; the script is ready in
+  [experiments/2026-10-scifact-rag-two-models](experiments/2026-10-scifact-rag-two-models/)).
 
 Exit: **Experiment 1**, published on the site. int8 and binary without rescoring versus f32, one
 small local embedding model, two chat models of very different size, a few hundred questions.
 The claim under test: the chat-model axis matters.
 
-## Phase 4 · Judged metrics
+## Phase 4 · Judged metrics (tooling done; re-scoring waits on Experiment 1)
 
-- LLM-as-judge scoring with a cheaper model: correctness against gold, and faithfulness to the
-  retrieved passages. Judge prompt versioned like the RAG prompt.
-- Agreement check between judge and exact match on the phase 3 data before trusting it.
+- [x] LLM-as-judge scoring with a cheaper model: `hvec judge run --batch <id> --judge <profile>`
+  grades correctness against gold and faithfulness to the retrieved passages. Judge prompt
+  versioned like the RAG prompt; verdicts are `judge` rows that `report` joins into cells.
+- [x] Agreement check between judge and exact / contains: `hvec judge agreement`, counting the
+  paraphrases the rule missed and the substrings it wrongly accepted.
+- [ ] Experiment 1 re-scored with the judge; a short post on where exact match and the judge
+  disagree.
 
 Exit: Experiment 1 re-scored with the judge; a short post on where exact match and the judge
 disagree.
 
-## Phase 5 · More codecs, and collapsing the layers
+## Phase 5 · More codecs, and collapsing the layers (done)
 
-- Product quantization with trained codebooks, and Matryoshka truncation as a codec.
-- **Experiment 2**: native low-precision embeddings versus post-hoc quantization of an f32 model
-  at the same byte budget. If native wins, the right codec is a different embedding model.
+- [x] Product quantization with trained codebooks (`pq<m>`), and Matryoshka truncation as a codec
+  (`mrl<k>`), composable with any other codec (`mrl<k>+int8`, `mrl<k>+pq<m>`). Embedding
+  profiles take task prefixes for models that need them.
+- [x] **Experiment 2**: native low-precision embeddings versus post-hoc quantization of an f32
+  model at the same byte budget, against the SciFact judgments:
+  [SciFact, native truncation against post-hoc quantization](experiments/2026-10-scifact-native-vs-posthoc/).
 
-## Phase 5b · The payload axis
+## Phase 5b · The payload axis (tooling done; Experiment 3 waiting on API access)
 
-- A `payload` stage between retrieval and the prompt: `none`, a naive truncation baseline, and
-  an adapter for an external compressor such as [Headroom](https://github.com/headroomlabs-ai/headroom)
-  running as a local proxy. Recorded per run like the codec.
-- **Experiment 3**: key compression alone, payload compression alone, and both together, on the
-  same questions and chat models. The claim under test: the two layers' effects on answers are
-  independent and additive, or they are not.
+- [x] A `payload` stage between retrieval and the prompt: `none`, a naive truncation baseline
+  (`truncate:<words>`), and an adapter for an external compressor such as
+  [Headroom](https://github.com/headroomlabs-ai/headroom) running as a local service
+  (`http:<url>`). Recorded per run like the codec, with the context size before and after.
+- [ ] **Experiment 3**: key compression alone, payload compression alone, and both together, on
+  the same questions and chat models. The claim under test: the two layers' effects on answers
+  are independent and additive, or they are not. Script ready in
+  [experiments/2026-10-scifact-key-and-payload](experiments/2026-10-scifact-key-and-payload/).
 
-## Phase 6 · Agent memory and the encryption track
+## Phase 6 · Agent memory and the encryption track (tooling done; research note published)
 
-- A memory-loop benchmark: an agent that writes tool results and turns back into the store and
-  retrieves them on later steps, measured per step on latency, bytes and answer quality.
-- Exploration of similarity on encrypted vectors (CKKS) as a codec with a very different cost
-  model. Research track; no promise of a usable result.
+- [x] A memory-loop benchmark: `hvec bench memory --script <jsonl>` replays an agent that writes
+  tool results and turns into the store and retrieves them on later steps, measured per step on
+  latency, bytes and answer quality, once per codec. A sample script is in
+  `questions/memory-smoke.jsonl`; a real run needs a chat model.
+- [x] Exploration of similarity on encrypted vectors (CKKS) as a codec with a very different cost
+  model: [a research note](docs/_posts/2026-10-12-encrypted-similarity-cost-model.md) with the
+  numbers. No code; the note says why not yet.
+
+## Next
+
+- Run Experiments 1 and 3 and the judge re-scoring as soon as two chat models are reachable;
+  the scripts need only `ANTHROPIC_API_KEY` (or an Ollama server) and a built `hvec`.
+- Codec follow-ups the write-ups flagged: a per-vector scale for `binary-centred`, a rotation
+  before the sign bits (ITQ or random, RaBitQ-style), optimised PQ with a learned rotation, and a
+  rescoring stage (fetch 5-10× candidates by codec, re-rank with int8 or f32).
+- A second corpus with graded, denser judgments than SciFact's.
 
 ## Always
 

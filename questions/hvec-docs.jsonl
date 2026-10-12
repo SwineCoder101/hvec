@@ -1,7 +1,7 @@
 # Questions about this repository's own documentation. Ingest README.md, CONTRIBUTING.md,
 # ROADMAP.md and docs/ into a collection, then: hvec bench run --questions questions/hvec-docs.jsonl --collections <name>
 {"id": "license", "question": "What license is hvec released under?", "answers": ["MIT"], "source": "README.md"}
-{"id": "codecs", "question": "Which codecs does hvec implement today?", "answers": ["f32, int8 and binary", "f32, int8, binary", "int8 and binary"], "source": "README.md"}
+{"id": "codecs", "question": "Which codec families does hvec implement today?", "answers": ["f32, int8, binary, binary-centred, pq and mrl", "int8, binary, binary-centred, pq", "product quantization"], "source": "README.md"}
 {"id": "key-payload", "question": "Does the agent read compressed vectors?", "answers": ["no"], "source": "glossary.md"}
 {"id": "headroom", "question": "What does Headroom compress?", "answers": ["payload", "text the model reads", "tool outputs"], "source": "README.md"}
 {"id": "baseline", "question": "What is the f32 codec used for?", "answers": ["baseline"], "source": "glossary.md"}
