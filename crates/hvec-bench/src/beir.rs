@@ -196,7 +196,9 @@ pub const CONTRADICT_ANSWERS: &[&str] = &["refutes", "contradicts"];
 /// Phrase a SciFact claim as the question the chat model sees.
 #[must_use]
 pub fn scifact_question(claim: &str) -> String {
-    format!("Does the evidence support or refute this claim? Answer with one word, supports or refutes, then cite. Claim: {claim}")
+    format!(
+        "Does the evidence support or refute this claim? Answer with one word, supports or refutes, then cite. Claim: {claim}"
+    )
 }
 
 /// Enrich BEIR SciFact questions with verdicts from the original release's
@@ -219,12 +221,7 @@ pub fn apply_scifact_labels(questions: &mut [Question], claims_path: &Path) -> R
     let mut labelled = 0;
     for q in questions.iter_mut() {
         let Some(c) = by_id.get(&q.id) else { continue };
-        let labels: BTreeSet<&str> = c
-            .evidence
-            .values()
-            .flatten()
-            .map(|e| e.label.as_str())
-            .collect();
+        let labels: BTreeSet<&str> = c.evidence.values().flatten().map(|e| e.label.as_str()).collect();
         let answers: &[&str] = match labels.iter().copied().collect::<Vec<_>>().as_slice() {
             ["SUPPORT"] => SUPPORT_ANSWERS,
             ["CONTRADICT"] => CONTRADICT_ANSWERS,
@@ -282,7 +279,10 @@ mod tests {
         let p = Path::new("q.tsv");
         let m = parse_qrels("1\t10\t1\n2\t20\t1\n", p).unwrap();
         assert_eq!(m.len(), 2);
-        assert!(matches!(parse_qrels("1\t10\n", p), Err(BeirError::Qrels { line: 1, .. })));
+        assert!(matches!(
+            parse_qrels("1\t10\n", p),
+            Err(BeirError::Qrels { line: 1, .. })
+        ));
         assert!(matches!(
             parse_qrels("a\tb\tc\n1\t10\tx\n", p),
             Err(BeirError::Qrels { line: 2, .. })
@@ -294,7 +294,10 @@ mod tests {
         let d = fixture();
         let out = d.path().join("txt");
         assert_eq!(write_corpus(d.path(), &out).unwrap(), 3);
-        assert_eq!(std::fs::read_to_string(out.join("10.txt")).unwrap(), "Alpha\n\nalpha body\n");
+        assert_eq!(
+            std::fs::read_to_string(out.join("10.txt")).unwrap(),
+            "Alpha\n\nalpha body\n"
+        );
         assert_eq!(std::fs::read_to_string(out.join("20.txt")).unwrap(), "beta body\n");
         assert_eq!(std::fs::read_to_string(out.join("30.txt")).unwrap(), "Gamma\n");
         assert_eq!(crate::questions::doc_id(out.join("10.txt").to_str().unwrap()), "10");

@@ -1,6 +1,7 @@
 pub mod bench;
 pub mod config;
 pub mod ingest;
+pub mod judge;
 pub mod list;
 pub mod query;
 pub mod questions;

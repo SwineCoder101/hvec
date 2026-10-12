@@ -553,16 +553,18 @@ fn bench_run_scores_answers_and_report_aggregates_cells() {
         "{cells_text}"
     );
 
-    // Report as JSON: every cell saw 3 questions, exact 1/3 (q1), contains 1/3, source hit 1/2 (q1 yes, q2 no; q3 unhinted).
+    // Report as JSON: every cell saw 3 questions, 2 with gold; exact 1/2 (q1), contains 1/2,
+    // source hit 1/2 (q1 yes, q2 no; q3 unhinted).
     let out = env.run(&["report", "--batch", &batch, "--json"]);
     assert_ok(&out, "report");
     let cells: Vec<serde_json::Value> = serde_json::from_str(&stdout(&out)).unwrap();
     assert_eq!(cells.len(), 4);
     for c in &cells {
         assert_eq!(c["n"], 3, "{c}");
+        assert_eq!(c["scored"], 2, "{c}");
         assert_eq!(c["errors"], 0);
-        assert!((c["exact"].as_f64().unwrap() - 1.0 / 3.0).abs() < 1e-9, "{c}");
-        assert!((c["contains"].as_f64().unwrap() - 1.0 / 3.0).abs() < 1e-9, "{c}");
+        assert_eq!(c["exact"], 0.5, "{c}");
+        assert_eq!(c["contains"], 0.5, "{c}");
         assert_eq!(c["key"]["question_set"], "refund-qa");
     }
     let f32_cells: Vec<&serde_json::Value> = cells.iter().filter(|c| c["key"]["codec"] == "f32").collect();
@@ -699,7 +701,11 @@ fn beir_import_feeds_labelled_recall_and_bench_run() {
     ]);
     assert_ok(&out, "import-beir");
     assert!(stdout(&out).contains("2 questions"), "{}", stdout(&out));
-    assert!(stdout(&out).contains("2 with relevance judgments, 2 judgments"), "{}", stdout(&out));
+    assert!(
+        stdout(&out).contains("2 with relevance judgments, 2 judgments"),
+        "{}",
+        stdout(&out)
+    );
     assert!(corpus.join("100.txt").exists() && corpus.join("300.txt").exists());
     let text = std::fs::read_to_string(&qs).unwrap();
     assert!(text.starts_with("# Imported from BEIR"), "{text}");
@@ -710,7 +716,14 @@ fn beir_import_feeds_labelled_recall_and_bench_run() {
     assert!(stdout(&out).contains("0 with gold answers"), "{}", stdout(&out));
 
     assert_ok(
-        &env.run(&["ingest", corpus.to_str().unwrap(), "--collection", "beir", "--ext", "txt"]),
+        &env.run(&[
+            "ingest",
+            corpus.to_str().unwrap(),
+            "--collection",
+            "beir",
+            "--ext",
+            "txt",
+        ]),
         "ingest corpus",
     );
 
@@ -761,7 +774,10 @@ fn beir_import_feeds_labelled_recall_and_bench_run() {
     assert_ok(&out, "bench run");
     let batch = stderr(&out)
         .lines()
-        .find_map(|l| l.strip_prefix("batch ").map(|l| l.split(':').next().unwrap().to_owned()))
+        .find_map(|l| {
+            l.strip_prefix("batch ")
+                .map(|l| l.split(':').next().unwrap().to_owned())
+        })
         .unwrap();
     let out = env.run(&["report", "--batch", &batch, "--json"]);
     assert_ok(&out, "report");
@@ -772,4 +788,110 @@ fn beir_import_feeds_labelled_recall_and_bench_run() {
     assert_eq!(cells[0]["doc_recall"], 1.0);
     let show = env.run(&["runs", "list", "-n", "1"]);
     assert_ok(&show, "runs list");
+}
+
+#[test]
+fn judge_grades_a_batch_and_reports_agreement() {
+    let env = Env::new();
+    let a = env.write_doc("refunds.md", REFUNDS);
+    let b = env.write_doc("shipping.md", SHIPPING);
+    assert_ok(
+        &env.run(&[
+            "ingest",
+            a.to_str().unwrap(),
+            b.to_str().unwrap(),
+            "--collection",
+            "docs",
+        ]),
+        "ingest",
+    );
+    // q1: contains right, judge right. q2: contains wrong (answer "next week"), judge says correct
+    // (a paraphrase the rule missed). q3: no gold, judged unfaithful. q4: contains right, judge wrong.
+    let qs = env.write_doc(
+        "qa.jsonl",
+        concat!(
+            "{\"id\":\"q1\",\"question\":\"refund window? say exactly Thirty days.\",\"answers\":[\"30 days\",\"thirty days\"]}\n",
+            "{\"id\":\"q2\",\"question\":\"shipping time? say exactly next week\",\"answers\":[\"three to five business days\"]}\n",
+            "{\"id\":\"q3\",\"question\":\"anything MOCK-UNFAITHFUL? say exactly whatever\"}\n",
+            "{\"id\":\"q4\",\"question\":\"refund method MOCK-WRONG? say exactly original payment method\",\"answers\":[\"original payment method\"]}\n",
+        ),
+    );
+    let out = env.run(&[
+        "bench",
+        "run",
+        "--questions",
+        qs.to_str().unwrap(),
+        "--collections",
+        "docs",
+        "-k",
+        "2",
+    ]);
+    assert_ok(&out, "bench run");
+    let batch = stderr(&out)
+        .lines()
+        .find_map(|l| {
+            l.strip_prefix("batch ")
+                .map(|l| l.split(':').next().unwrap().to_owned())
+        })
+        .unwrap();
+
+    let out = env.run(&["judge", "run", "--batch", &batch, "--judge", "mock-openai"]);
+    assert_ok(&out, "judge run");
+    let se = stderr(&out);
+    assert!(se.contains("judging 4 runs"), "{se}");
+    assert!(se.contains("4 verdicts recorded"), "{se}");
+    assert!(se.contains("(contains said false)"), "{se}");
+    let so = stdout(&out);
+    assert!(so.contains("3 judged runs with gold answers"), "{so}");
+    assert!(so.contains("judge correct but contains wrong: 1"), "{so}");
+    assert!(so.contains("contains right but judge wrong: 1"), "{so}");
+
+    // The judge saw the passages, the gold answers and the answer, through the OpenAI route.
+    let reqs = env.server.openai_requests();
+    assert_eq!(reqs.len(), 4);
+    let user = reqs[0].body["messages"][1]["content"].as_str().unwrap();
+    assert!(user.contains("Retrieved passages:\n[1]"), "{user}");
+    assert!(user.contains("Gold answers: \"30 days\", \"thirty days\""), "{user}");
+    assert!(user.contains("System answer: Thirty days."), "{user}");
+    assert_eq!(reqs[0].body["max_tokens"], 300);
+
+    // Judge rows carry the bench run id and show up in the report.
+    assert_eq!(count_runs(&stdout(&env.run(&["runs", "list", "-n", "50"])), "judge"), 4);
+    let out = env.run(&["report", "--batch", &batch, "--json"]);
+    assert_ok(&out, "report");
+    let cells: Vec<serde_json::Value> = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(cells.len(), 1);
+    assert_eq!(cells[0]["n"], 4);
+    assert_eq!(cells[0]["scored"], 3);
+    assert_eq!(cells[0]["judged"], 4);
+    assert!((cells[0]["judge_correct"].as_f64().unwrap() - 2.0 / 3.0).abs() < 1e-9);
+    assert_eq!(cells[0]["judge_faithful"], 0.75);
+    assert!((cells[0]["contains"].as_f64().unwrap() - 2.0 / 3.0).abs() < 1e-9);
+    let table = env.run(&["report", "--batch", &batch]);
+    assert!(stdout(&table).contains("judged faithf"), "{}", stdout(&table));
+
+    // Already-judged runs are skipped unless --rejudge.
+    let again = env.run(&["judge", "run", "--batch", &batch, "--judge", "mock-openai"]);
+    assert!(!again.status.success());
+    assert!(stderr(&again).contains("no unjudged bench runs"), "{}", stderr(&again));
+    let out = env.run(&[
+        "judge",
+        "run",
+        "--batch",
+        &batch,
+        "--judge",
+        "mock-openai",
+        "--rejudge",
+        "--limit",
+        "1",
+    ]);
+    assert_ok(&out, "rejudge");
+    assert!(stderr(&out).contains("judging 1 runs"), "{}", stderr(&out));
+
+    let out = env.run(&["judge", "agreement", "--batch", &batch, "--json"]);
+    assert_ok(&out, "agreement");
+    let a: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(a["n"], 3);
+    assert_eq!(a["judge_only"], 1);
+    assert_eq!(a["contains_only"], 1);
 }

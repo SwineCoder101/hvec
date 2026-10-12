@@ -83,10 +83,26 @@ fn handle(mut stream: TcpStream, log: &Mutex<Vec<Recorded>>) {
     let body: serde_json::Value = serde_json::from_slice(&raw).unwrap_or(serde_json::Value::Null);
 
     let user_text = last_user_text(&body);
+    // A judge request (system prompt starts with the grader preamble) gets a
+    // verdict: correct unless the prompt mentions MOCK-WRONG, faithful unless
+    // it mentions MOCK-UNFAITHFUL, null correctness when there is no gold.
+    let is_judge = system_text(&body).starts_with("You are a strict grader");
     // "say exactly <x>" anywhere in the last user turn makes the mock answer "<x>".
-    let echo = user_text
-        .rsplit_once("say exactly ")
-        .map(|(_, rest)| rest.lines().next().unwrap_or("").trim().to_owned());
+    let echo = if is_judge {
+        let correct = if user_text.contains("(none; output null for correct)") {
+            "null".to_owned()
+        } else {
+            (!user_text.contains("MOCK-WRONG")).to_string()
+        };
+        let faithful = !user_text.contains("MOCK-UNFAITHFUL");
+        Some(format!(
+            "Verdict:\n{{\"correct\": {correct}, \"faithful\": {faithful}, \"reason\": \"mock\"}}"
+        ))
+    } else {
+        user_text
+            .rsplit_once("say exactly ")
+            .map(|(_, rest)| rest.lines().next().unwrap_or("").trim().to_owned())
+    };
     let (status, payload) = if path.ends_with("/v1/messages") {
         if user_text.contains("PLEASE-REFUSE") {
             (
@@ -133,6 +149,19 @@ fn handle(mut stream: TcpStream, log: &Mutex<Vec<Recorded>>) {
         data.len()
     );
     let _ = stream.flush();
+}
+
+fn system_text(body: &serde_json::Value) -> String {
+    // Anthropic: top-level `system`; OpenAI: a message with role `system`.
+    if let Some(s) = body["system"].as_str() {
+        return s.to_owned();
+    }
+    body["messages"]
+        .as_array()
+        .and_then(|m| m.iter().find(|x| x["role"] == "system"))
+        .and_then(|m| m["content"].as_str())
+        .unwrap_or("")
+        .to_owned()
 }
 
 fn last_user_text(body: &serde_json::Value) -> String {

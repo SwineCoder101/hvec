@@ -20,6 +20,8 @@ pub struct CellKey {
 pub struct Cell {
     pub key: CellKey,
     pub n: usize,
+    /// Questions with gold answers, over which `exact` and `contains` are averaged.
+    pub scored: usize,
     pub exact: f64,
     pub contains: f64,
     /// Fraction of questions with a retrieval label whose retrieval hit it. `None` if none.
@@ -35,15 +37,27 @@ pub struct Cell {
     pub errors: usize,
     /// Runs whose served model (`metadata.chat_model_served`) differed from the configured one.
     pub served_other: usize,
+    /// Runs with a judge verdict (see `judge.rs`).
+    pub judged: usize,
+    /// Fraction judged correct, over judged runs with gold answers.
+    pub judge_correct: Option<f64>,
+    /// Fraction judged faithful to the retrieved passages, over judged runs.
+    pub judge_faithful: Option<f64>,
 }
 
 fn num(v: &serde_json::Value) -> f64 {
     v.as_f64().unwrap_or(0.0)
 }
 
-/// Group `bench` rows into cells. Rows of other kinds are ignored.
+/// Group `bench` rows into cells. Rows of other kinds are ignored, except
+/// `judge` rows, which attach to the bench run named in `metadata.run_id`.
 #[must_use]
 pub fn aggregate(rows: &[RunRow]) -> Vec<Cell> {
+    let verdicts: BTreeMap<&str, &RunRow> = rows
+        .iter()
+        .filter(|r| r.kind == "judge")
+        .filter_map(|r| r.metadata["run_id"].as_str().map(|id| (id, r)))
+        .collect();
     let mut groups: BTreeMap<CellKey, Vec<&RunRow>> = BTreeMap::new();
     for r in rows.iter().filter(|r| r.kind == "bench") {
         let key = CellKey {
@@ -59,59 +73,49 @@ pub fn aggregate(rows: &[RunRow]) -> Vec<Cell> {
         .into_iter()
         .map(|(key, rows)| {
             let n = rows.len();
-            let ok: Vec<&&RunRow> = rows.iter().filter(|r| r.metadata["error"].is_null()).collect();
+            let ok: Vec<&RunRow> = rows.iter().copied().filter(|r| r.metadata["error"].is_null()).collect();
             let errors = n - ok.len();
-            let mean = |f: &dyn Fn(&RunRow) -> f64| {
-                if ok.is_empty() {
-                    0.0
-                } else {
-                    ok.iter().map(|r| f(r)).sum::<f64>() / ok.len() as f64
-                }
-            };
-            let hinted: Vec<&&&RunRow> = ok.iter().filter(|r| !r.metrics["source_hit"].is_null()).collect();
-            let source_hit = if hinted.is_empty() {
-                None
-            } else {
-                Some(
-                    hinted
-                        .iter()
-                        .filter(|r| r.metrics["source_hit"].as_bool() == Some(true))
-                        .count() as f64
-                        / hinted.len() as f64,
-                )
-            };
-            let judged: Vec<&&&RunRow> = ok.iter().filter(|r| !r.metrics["ndcg"].is_null()).collect();
-            let judged_mean = |field: &str| {
-                if judged.is_empty() {
+            let has_gold = |r: &RunRow| r.metadata["answers"].as_array().is_some_and(|a| !a.is_empty());
+            let gold: Vec<&RunRow> = ok.iter().copied().filter(|r| has_gold(r)).collect();
+            let is_true = |v: &serde_json::Value| v.as_bool() == Some(true);
+            let mean_of = |items: &[&RunRow], f: &dyn Fn(&RunRow) -> f64| {
+                if items.is_empty() {
                     None
                 } else {
-                    Some(judged.iter().map(|r| num(&r.metrics[field])).sum::<f64>() / judged.len() as f64)
+                    Some(items.iter().map(|r| f(r)).sum::<f64>() / items.len() as f64)
                 }
             };
+            let frac_of = |items: &[&RunRow], field: &str| {
+                mean_of(items, &|r| if is_true(&r.metrics[field]) { 1.0 } else { 0.0 })
+            };
+
+            let hinted: Vec<&RunRow> = ok
+                .iter()
+                .copied()
+                .filter(|r| !r.metrics["source_hit"].is_null())
+                .collect();
+            let labelled: Vec<&RunRow> = ok.iter().copied().filter(|r| !r.metrics["ndcg"].is_null()).collect();
+
+            let judged: Vec<(&RunRow, &RunRow)> = ok
+                .iter()
+                .filter_map(|r| verdicts.get(r.id.as_str()).map(|v| (*r, *v)))
+                .collect();
+            let verdict_rows: Vec<&RunRow> = judged.iter().map(|(_, v)| *v).collect();
+            let verdict_rows_gold: Vec<&RunRow> = judged.iter().filter(|(r, _)| has_gold(r)).map(|(_, v)| *v).collect();
+
             Cell {
                 key,
                 n,
-                exact: mean(&|r| {
-                    if r.metrics["exact"].as_bool() == Some(true) {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }),
-                contains: mean(&|r| {
-                    if r.metrics["contains"].as_bool() == Some(true) {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }),
-                source_hit,
-                doc_recall: judged_mean("doc_recall"),
-                ndcg: judged_mean("ndcg"),
-                mean_retrieval_ms: mean(&|r| num(&r.metrics["retrieval_ms"])),
-                mean_generation_ms: mean(&|r| num(&r.metrics["generation_ms"])),
-                mean_input_tokens: mean(&|r| num(&r.metrics["input_tokens"])),
-                mean_output_tokens: mean(&|r| num(&r.metrics["output_tokens"])),
+                scored: gold.len(),
+                exact: frac_of(&gold, "exact").unwrap_or(0.0),
+                contains: frac_of(&gold, "contains").unwrap_or(0.0),
+                source_hit: frac_of(&hinted, "source_hit"),
+                doc_recall: mean_of(&labelled, &|r| num(&r.metrics["doc_recall"])),
+                ndcg: mean_of(&labelled, &|r| num(&r.metrics["ndcg"])),
+                mean_retrieval_ms: mean_of(&ok, &|r| num(&r.metrics["retrieval_ms"])).unwrap_or(0.0),
+                mean_generation_ms: mean_of(&ok, &|r| num(&r.metrics["generation_ms"])).unwrap_or(0.0),
+                mean_input_tokens: mean_of(&ok, &|r| num(&r.metrics["input_tokens"])).unwrap_or(0.0),
+                mean_output_tokens: mean_of(&ok, &|r| num(&r.metrics["output_tokens"])).unwrap_or(0.0),
                 errors,
                 served_other: ok
                     .iter()
@@ -121,6 +125,9 @@ pub fn aggregate(rows: &[RunRow]) -> Vec<Cell> {
                             .is_some_and(|s| Some(s) != r.chat_model.as_deref())
                     })
                     .count(),
+                judged: judged.len(),
+                judge_correct: frac_of(&verdict_rows_gold, "correct"),
+                judge_faithful: frac_of(&verdict_rows, "faithful"),
             }
         })
         .collect()
@@ -136,9 +143,16 @@ mod tests {
         r.embed_model = Some("bge".into());
         r.codec = Some(codec.into());
         r.chat_model = Some(chat.into());
-        r.metadata = serde_json::json!({ "question_set": set });
+        r.metadata = serde_json::json!({ "question_set": set, "answers": ["gold"] });
         r.metrics = serde_json::json!({ "exact": exact, "contains": contains, "source_hit": hit, "retrieval_ms": 2, "generation_ms": gen_ms, "input_tokens": 100, "output_tokens": 10 });
         r
+    }
+
+    fn verdict(run: &RunRow, correct: bool, faithful: bool) -> RunRow {
+        let mut v = RunRow::new("judge");
+        v.metadata = serde_json::json!({ "run_id": run.id });
+        v.metrics = serde_json::json!({ "correct": correct, "faithful": faithful });
+        v
     }
 
     #[test]
@@ -163,6 +177,38 @@ mod tests {
         assert_eq!(bin.contains, 0.0);
         assert_eq!(f32.served_other, 0);
         assert_eq!(f32.ndcg, None);
+        assert_eq!(f32.scored, 2);
+        assert_eq!(f32.judged, 0);
+        assert_eq!(f32.judge_correct, None);
+    }
+
+    #[test]
+    fn accuracy_is_averaged_over_questions_with_gold_answers() {
+        let mut no_gold = row("qa", "f32", "opus", false, false, Some(true), 1);
+        no_gold.metadata["answers"] = serde_json::json!([]);
+        let gold = row("qa", "f32", "opus", true, true, None, 1);
+        let cells = aggregate(&[no_gold, gold]);
+        assert_eq!(cells[0].n, 2);
+        assert_eq!(cells[0].scored, 1);
+        assert_eq!(cells[0].exact, 1.0);
+        assert_eq!(cells[0].source_hit, Some(1.0));
+    }
+
+    #[test]
+    fn judge_rows_attach_to_their_bench_run() {
+        let a = row("qa", "f32", "opus", true, true, None, 1);
+        let b = row("qa", "f32", "opus", false, false, None, 1);
+        let mut c = row("qa", "f32", "opus", false, false, None, 1);
+        c.metadata["answers"] = serde_json::json!([]);
+        let va = verdict(&a, true, true);
+        let vb = verdict(&b, false, true);
+        let vc = verdict(&c, true, false);
+        let cells = aggregate(&[a, b, c, va, vb, vc]);
+        assert_eq!(cells.len(), 1);
+        assert_eq!(cells[0].judged, 3);
+        // Correctness over the two judged runs with gold; faithfulness over all three.
+        assert_eq!(cells[0].judge_correct, Some(0.5));
+        assert!((cells[0].judge_faithful.unwrap() - 2.0 / 3.0).abs() < 1e-9);
     }
 
     #[test]

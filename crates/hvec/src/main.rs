@@ -27,6 +27,7 @@ async fn main() -> Result<()> {
         Command::Bench(cmd) => commands::bench::run(&cli.config, cmd).await,
         Command::Questions(cmd) => commands::questions::run(cmd),
         Command::Report(args) => commands::bench::report(&cli.config, &args),
+        Command::Judge(cmd) => commands::judge::run(&cli.config, cmd).await,
         Command::Query(args) => commands::query::run(&cli.config, args).await,
         Command::Chat(args) => commands::shell::run(&cli.config, args).await,
     }

@@ -67,6 +67,9 @@ pub enum Command {
     Questions(QuestionsCommand),
     /// Summarise `bench run` results by matrix cell.
     Report(ReportArgs),
+    /// Grade recorded answers with a judge model, and compare it with the cheap rules.
+    #[command(subcommand)]
+    Judge(JudgeCommand),
     /// Ask one question against a collection and record the run.
     Query(QueryArgs),
     /// Open the interactive shell. Same as running `hvec` with no subcommand.
@@ -177,6 +180,48 @@ pub struct BenchRunArgs {
     #[arg(long)]
     pub label: Option<String>,
     /// Stop at the first model error instead of recording it and continuing.
+    #[arg(long)]
+    pub fail_fast: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum JudgeCommand {
+    /// Grade every answer in a batch for correctness against gold and faithfulness to its passages.
+    Run(JudgeArgs),
+    /// How often the judge agrees with `exact` and `contains` on the judged runs.
+    Agreement {
+        /// Only runs from this batch id (prefix).
+        #[arg(long)]
+        batch: Option<String>,
+        /// Only this question set (file stem).
+        #[arg(long)]
+        set: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Debug, Args)]
+pub struct JudgeArgs {
+    /// The `bench run` batch id (prefix) to grade.
+    #[arg(long)]
+    pub batch: String,
+    /// Chat profile used as the judge. Defaults to `default_chat`; pick a cheaper model.
+    #[arg(long)]
+    pub judge: Option<String>,
+    /// Only this question set (file stem).
+    #[arg(long)]
+    pub set: Option<String>,
+    /// Grade runs that already have a verdict again.
+    #[arg(long)]
+    pub rejudge: bool,
+    /// Only the first N unjudged runs.
+    #[arg(long)]
+    pub limit: Option<usize>,
+    /// Maximum output tokens for the verdict.
+    #[arg(long, default_value_t = 300)]
+    pub max_tokens: u32,
+    /// Stop at the first judge error instead of skipping it.
     #[arg(long)]
     pub fail_fast: bool,
 }

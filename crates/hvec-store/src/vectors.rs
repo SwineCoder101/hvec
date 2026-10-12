@@ -173,6 +173,19 @@ impl Store {
         rows.collect::<std::result::Result<_, _>>().map_err(Into::into)
     }
 
+    /// The text of each chunk id that still exists, in the order given.
+    /// Ids whose chunk was deleted are skipped.
+    pub fn chunk_texts(&self, ids: &[i64]) -> Result<Vec<(i64, String)>> {
+        let mut stmt = self.conn.prepare_cached("SELECT text FROM chunks WHERE id = ?1")?;
+        let mut out = Vec::with_capacity(ids.len());
+        for id in ids {
+            if let Some(text) = stmt.query_row(params![id], |row| row.get::<_, String>(0)).optional()? {
+                out.push((*id, text));
+            }
+        }
+        Ok(out)
+    }
+
     /// Every stored chunk's id, source path and encoded vector, in insertion order.
     pub fn vectors_with_sources(&self, collection: &str) -> Result<Vec<(i64, String, Encoded)>> {
         self.require_collection(collection)?;
@@ -305,6 +318,13 @@ mod tests {
         assert_eq!(hits.len(), 2);
         assert_eq!(hits[0].text, "east");
         assert_eq!(hits[1].text, "ne");
+        let texts = store.chunk_texts(&[hits[1].chunk_id, 999, hits[0].chunk_id]).unwrap();
+        assert_eq!(texts.len(), 2);
+        assert_eq!(texts[0].1, "ne");
+        assert_eq!(texts[1].1, "east");
+        let with_sources = store.vectors_with_sources("docs").unwrap();
+        assert_eq!(with_sources.len(), 3);
+        assert_eq!(with_sources[0].1, "a");
 
         let hits = store.search("docs", &[0.0, 1.0], 1, &codec, Metric::L2).unwrap();
         assert_eq!(hits[0].text, "north");

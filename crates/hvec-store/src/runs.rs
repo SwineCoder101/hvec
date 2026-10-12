@@ -93,6 +93,16 @@ impl Store {
         rows.collect::<std::result::Result<_, _>>().map_err(Into::into)
     }
 
+    /// Every run whose kind is one of `kinds`, oldest first. Optionally only one batch.
+    pub fn runs_by_kinds(&self, kinds: &[&str], batch: Option<&str>) -> Result<Vec<RunRow>> {
+        let mut out = Vec::new();
+        for kind in kinds {
+            out.extend(self.runs_by_kind(kind, batch)?);
+        }
+        out.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        Ok(out)
+    }
+
     /// Look up by full id or unique prefix.
     pub fn get_run(&self, id_or_prefix: &str) -> Result<RunRow> {
         let pattern = format!("{id_or_prefix}%");
@@ -158,5 +168,6 @@ mod tests {
         assert_eq!(store.runs_by_kind("bench", None).unwrap().len(), 2);
         assert_eq!(store.runs_by_kind("bench", Some("b1")).unwrap().len(), 1);
         assert_eq!(store.runs_by_kind("recall", None).unwrap().len(), 0);
+        assert_eq!(store.runs_by_kinds(&["bench", "query"], Some("b1")).unwrap().len(), 2);
     }
 }

@@ -344,8 +344,7 @@ mod tests {
     #[test]
     fn parse_jsonl_with_comments_and_errors() {
         let p = Path::new("qs.jsonl");
-        let text =
-            "# comment\n{\"id\":\"a\",\"question\":\"x?\",\"answers\":[\"y\"]}\n\n{\"id\":\"b\",\"question\":\"z?\",\"query\":\"zz\",\"relevant\":[\"1\",\"2\"]}\n";
+        let text = "# comment\n{\"id\":\"a\",\"question\":\"x?\",\"answers\":[\"y\"]}\n\n{\"id\":\"b\",\"question\":\"z?\",\"query\":\"zz\",\"relevant\":[\"1\",\"2\"]}\n";
         let qs = parse(text, p).unwrap();
         assert_eq!(qs.len(), 2);
         assert!(qs[1].answers.is_empty());

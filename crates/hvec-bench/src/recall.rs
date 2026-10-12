@@ -144,7 +144,13 @@ pub fn evaluate(
     }
 
     let nq = queries.len().max(1) as f64;
-    let labelled_mean = |sum: f64| if labelled == 0 { None } else { Some(sum / labelled as f64) };
+    let labelled_mean = |sum: f64| {
+        if labelled == 0 {
+            None
+        } else {
+            Some(sum / labelled as f64)
+        }
+    };
     Ok(RecallReport {
         codec: codec.name().to_owned(),
         metric,
@@ -245,11 +251,29 @@ mod tests {
             let own = q.exclude.unwrap() / 100;
             q.relevant = vec![format!("c{own}")];
         }
-        let f = evaluate(&ids, &vecs, &queries, &F32Codec::new(64), Metric::Cosine, 5, Some(&sources)).unwrap();
+        let f = evaluate(
+            &ids,
+            &vecs,
+            &queries,
+            &F32Codec::new(64),
+            Metric::Cosine,
+            5,
+            Some(&sources),
+        )
+        .unwrap();
         assert_eq!(f.labelled_queries, 16);
         assert_eq!(f.ndcg_at_k, Some(1.0));
         assert_eq!(f.doc_recall_at_k, Some(1.0));
-        let b = evaluate(&ids, &vecs, &queries, &BinaryCodec::new(64), Metric::Cosine, 5, Some(&sources)).unwrap();
+        let b = evaluate(
+            &ids,
+            &vecs,
+            &queries,
+            &BinaryCodec::new(64),
+            Metric::Cosine,
+            5,
+            Some(&sources),
+        )
+        .unwrap();
         assert!(b.ndcg_at_k.unwrap() <= 1.0 && b.ndcg_at_k.unwrap() > 0.0);
         // Without sources the labels cannot be applied.
         let none = evaluate(&ids, &vecs, &queries, &F32Codec::new(64), Metric::Cosine, 5, None).unwrap();

@@ -170,7 +170,7 @@ async fn run_cmd(config: &Option<PathBuf>, args: BenchRunArgs) -> Result<()> {
             String::new()
         }
     );
-    let rows = store.runs_by_kind("bench", Some(&batch))?;
+    let rows = store.runs_by_kinds(&["bench", "judge"], Some(&batch))?;
     print_cells(&rpt::aggregate(&rows));
     eprintln!("\nreport again with: hvec report --batch {batch}");
     Ok(())
@@ -179,7 +179,7 @@ async fn run_cmd(config: &Option<PathBuf>, args: BenchRunArgs) -> Result<()> {
 pub fn report(config: &Option<PathBuf>, args: &ReportArgs) -> Result<()> {
     let ctx = Ctx::load(config.as_deref())?;
     let store = ctx.open_store()?;
-    let rows = store.runs_by_kind("bench", args.batch.as_deref())?;
+    let rows = store.runs_by_kinds(&["bench", "judge"], args.batch.as_deref())?;
     let mut cells = rpt::aggregate(&rows);
     if let Some(set) = &args.set {
         cells.retain(|c| &c.key.question_set == set);
@@ -198,18 +198,22 @@ pub fn report(config: &Option<PathBuf>, args: &ReportArgs) -> Result<()> {
 
 fn print_cells(cells: &[Cell]) {
     let mut rerouted = 0usize;
+    let judged = cells.iter().any(|c| c.judged > 0);
+    let opt = |v: Option<f64>| v.map_or("-".to_owned(), |v| format!("{v:.3}"));
     println!(
-        "{:<12} {:<18} {:<26} {:<15} {:<24} {:>4} {:>6} {:>8} {:>7} {:>6} {:>7} {:>7} {:>6} {:>6} {:>4}",
+        "{:<12} {:<18} {:<26} {:<15} {:<24} {:>4} {:>5} {:>6} {:>8} {:>7} {:>6}{} {:>7} {:>7} {:>6} {:>6} {:>4}",
         "set",
         "collection",
         "embed model",
         "codec",
         "chat model",
         "n",
+        "gold",
         "exact",
         "contains",
         "src hit",
         "ndcg",
+        if judged { "  judged faithf" } else { "" },
         "ret ms",
         "gen ms",
         "in",
@@ -219,17 +223,23 @@ fn print_cells(cells: &[Cell]) {
     for c in cells {
         let embed = c.key.embed_model.rsplit('/').next().unwrap_or(&c.key.embed_model);
         println!(
-            "{:<12} {:<18} {:<26} {:<15} {:<24} {:>4} {:>6.3} {:>8.3} {:>7} {:>6} {:>7.0} {:>7.0} {:>6.0} {:>6.0} {:>4}",
+            "{:<12} {:<18} {:<26} {:<15} {:<24} {:>4} {:>5} {:>6.3} {:>8.3} {:>7} {:>6}{} {:>7.0} {:>7.0} {:>6.0} {:>6.0} {:>4}",
             trunc(&c.key.question_set, 12),
             trunc(&c.key.collection, 18),
             trunc(embed, 26),
             c.key.codec,
             trunc(&c.key.chat_model, 24),
             c.n,
+            c.scored,
             c.exact,
             c.contains,
-            c.source_hit.map_or("-".to_owned(), |v| format!("{v:.3}")),
-            c.ndcg.map_or("-".to_owned(), |v| format!("{v:.3}")),
+            opt(c.source_hit),
+            opt(c.ndcg),
+            if judged {
+                format!("  {:>6} {:>6}", opt(c.judge_correct), opt(c.judge_faithful))
+            } else {
+                String::new()
+            },
             c.mean_retrieval_ms,
             c.mean_generation_ms,
             c.mean_input_tokens,
@@ -237,6 +247,11 @@ fn print_cells(cells: &[Cell]) {
             c.errors
         );
         rerouted += c.served_other;
+    }
+    if judged {
+        println!(
+            "\njudged = fraction the judge marked correct (over judged questions with gold); faithf = fraction judged faithful to the retrieved passages"
+        );
     }
     if rerouted > 0 {
         println!(
@@ -299,7 +314,13 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
                 })
                 .collect();
             let n = queries.len();
-            (queries, format!("questions:{} ({n} questions, {labelled} with judgments)", path.display()))
+            (
+                queries,
+                format!(
+                    "questions:{} ({n} questions, {labelled} with judgments)",
+                    path.display()
+                ),
+            )
         }
         (Some(path), None) => {
             let text = tokio::fs::read_to_string(path)
