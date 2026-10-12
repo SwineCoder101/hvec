@@ -48,9 +48,8 @@ Familiar techniques already sit on this spectrum, even if they are rarely named 
 hvec is a place to implement these side by side in Rust, measure them honestly, and explore the
 gaps between them. It does this with a CLI that runs a real retrieval-augmented generation (RAG)
 pipeline end to end: ingest documents, store their embeddings through a codec, retrieve in the
-compressed domain, ask a chat model, and record every stage's cost and outcome. The question hvec
-exists to answer is not "what is recall@10" but "does this compression change the answers a given
-model gives, and by how much".
+compressed domain, ask a chat model, and record every stage's cost and outcome. Every number it
+produces answers one of the two questions in the next section.
 
 ## Where hvec sits
 
@@ -72,21 +71,62 @@ complementary. A Headroom-style stage is an axis of the hvec benchmark matrix (`
 http:<url>` hands the retrieved passages to a local compressor service), so the combined effect
 of compressing the key and the payload is measured in one run log.
 
-## Goals
+## Purpose
 
-- **Implement** a family of compressed-domain similarity codecs behind a shared trait.
-- **Measure** recall, distance error, throughput, and memory, and then the thing that matters:
-  end-to-end answer quality per chat model, with reproducible runs.
-- **Explore** the boundary between lossy compression and privacy-preserving computation. The
-  encryption side (computing similarity on encrypted vectors) is in scope as an experiment track.
-- **Stay small.** This is a research sandbox, not a database. Results should be easy to lift
-  into real systems.
+hvec exists to test claims about compressing embedding vectors, with numbers that survive a
+sceptical reader. It asks two questions, in order, and each experiment says which one it is
+answering.
+
+### 1. What does compressing the vectors save, and what does it cost?
+
+This is a use case in its own right, with no chat model in it. A vector store is memory, and
+compressing its vectors is the main lever on what that memory costs. It matters most when:
+
+- there are millions of vectors, so bytes per vector decide storage and RAM;
+- search has to run on a phone or a laptop, so a useful index has to fit on the device;
+- the scan is bound by memory bandwidth, so reading fewer bytes can raise throughput, if the
+  scoring and conversion overhead do not eat the gain;
+- there are many indexes (customers, datasets, replicas), so savings accumulate.
+
+The price is retrieval quality: aggressive compression changes which results come back. hvec
+measures that price against relevance judgments, not only against agreement with the f32
+ranking, because the two disagree by a factor of six on the same data (binary loses 39 points
+of f32 agreement and 4.4 points of nDCG@10 on SciFact).
+
+A codec earns a claim in hvec in one of three forms, each with its own measurement and its own
+limit:
+
+| Claim | What hvec measures | What that does not show |
+|---|---|---|
+| **Less memory at comparable quality** | Bytes per vector, and nDCG@k and document recall@k against the labels, next to the f32 ceiling | Anything about speed |
+| **Faster search** | Scan time of the compressed-domain score over the whole collection | Not yet claimable: hvec scores every codec asymmetrically against a float query in a brute-force scan, so binary is no faster than int8 here, and nothing in the harness is memory-bandwidth bound. A speed claim needs a symmetric (Hamming, lookup-table) path and a setting where bytes read is the bottleneck |
+| **Useful operations directly on the compressed vectors** | Every codec's `score` runs without decoding, and is tested to equal the metric on the decoded vector | Whether the operation is cheap; see the speed row |
+
+Where the published numbers stand on the first claim: `int8` is 4× smaller and indistinguishable
+from f32 against the labels; `pq48` is 32× smaller at two points of nDCG@10; `binary` is 32×
+smaller at 4.4 points. On the second claim hvec makes no claim yet. The useful advantage a new
+codec has to demonstrate is over *those* numbers, on the same corpus, with the byte count stated.
+
+### 2. Does the loss reach the answer?
+
+Smaller retrieval infrastructure is worth having even when the agent ends up reading the same
+amount of text. The second question is whether the retrieval loss the first question measured
+changes what a chat model says, and by how much, per model. That is what `bench run`, the judge
+and the payload stage are for, and why every run records the embedding model, codec, payload
+stage and chat model together. The compression literature stops at retrieval metrics;
+application teams care about answers; hvec covers both, and keeps them separate.
+
+What a result has to look like, whichever question it answers: a commit hash, a config and a
+command next to every number; the byte budget stated; the f32 ceiling in the same table;
+negative results published.
 
 ## Non-goals
 
 - Building a full vector database, indexing service, or network API.
 - Production hardening or stability guarantees.
 - Competing with mature libraries on raw speed before the ideas are proven.
+- Picking database settings for you. Production users should use their database's built-in
+  quantization and an eval harness; hvec exists to understand codecs.
 
 ## Layout
 
