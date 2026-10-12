@@ -21,6 +21,7 @@ pub async fn run(config: &Option<PathBuf>, cmd: BenchCommand) -> Result<()> {
     match cmd {
         BenchCommand::Recall(args) => recall_cmd(config, args).await,
         BenchCommand::Run(args) => run_cmd(config, args).await,
+        BenchCommand::Memory(args) => crate::commands::memory::run(config, args).await,
     }
 }
 

@@ -3,6 +3,7 @@ pub mod config;
 pub mod ingest;
 pub mod judge;
 pub mod list;
+pub mod memory;
 pub mod query;
 pub mod questions;
 pub mod shell;

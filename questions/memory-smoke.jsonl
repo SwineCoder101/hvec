@@ -1,0 +1,13 @@
+# A small agent memory script for `hvec bench memory --script questions/memory-smoke.jsonl`.
+# Writes imitate tool results an agent would store; asks come back to them later.
+{"id": "w1", "write": "Tool result (deploy): deploy of service billing to eu-west-1 failed with exit code 137 after 42 seconds; the container was OOM-killed at 512 MiB.", "source": "tool:deploy"}
+{"id": "w2", "write": "Tool result (search): the on-call rota for this week lists Priya for payments and Tomas for storage.", "source": "tool:search"}
+{"id": "w3", "write": "Turn: user says the customer id for the escalation is C-77213 and the ticket number is INC-4410.", "source": "turn:user"}
+{"id": "q1", "ask": "What exit code did the billing deploy to eu-west-1 fail with?", "answers": ["137"], "source": "tool:deploy"}
+{"id": "w4", "write": "Tool result (metrics): billing p99 latency rose from 180 ms to 2.4 s between 09:10 and 09:25 UTC.", "source": "tool:metrics"}
+{"id": "w5", "write": "Tool result (git): the last change to the billing service was commit 8f3a1c2, 'raise batch size to 5000', by Tomas.", "source": "tool:git"}
+{"id": "q2", "ask": "Who is on call for payments this week?", "answers": ["Priya"], "source": "tool:search"}
+{"id": "q3", "ask": "What is the ticket number for the escalation?", "answers": ["INC-4410"], "source": "turn:user"}
+{"id": "w6", "write": "Tool result (deploy): rollback of billing to the previous image succeeded in eu-west-1; p99 latency back to 190 ms.", "source": "tool:deploy"}
+{"id": "q4", "ask": "Which commit most likely caused the billing memory problem, and who wrote it?", "answers": ["8f3a1c2"], "source": "tool:git"}
+{"id": "q5", "ask": "What was the billing p99 latency after the rollback?", "answers": ["190 ms"], "source": "tool:deploy"}

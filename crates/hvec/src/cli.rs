@@ -157,6 +157,48 @@ pub enum BenchCommand {
     Recall(RecallArgs),
     /// Run a question set across collections and chat profiles, scoring every answer.
     Run(BenchRunArgs),
+    /// Replay an agent memory script (writes and asks) once per codec, measuring every step.
+    Memory(MemoryArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct MemoryArgs {
+    /// JSONL memory script: {"id","write","source"} and {"id","ask","answers":[..],"source"} steps.
+    #[arg(short, long)]
+    pub script: PathBuf,
+    /// Codecs to replay the script with. Each gets a fresh memory collection.
+    #[arg(long, value_delimiter = ',', default_value = "f32,int8,binary")]
+    pub codecs: Vec<String>,
+    /// Embedding profile. Defaults to `default_embedder` in config.
+    #[arg(short, long)]
+    pub embedder: Option<String>,
+    /// Chat profile for the ask steps. Defaults to `default_chat`.
+    #[arg(long)]
+    pub chat: Option<String>,
+    /// Memories to retrieve per ask.
+    #[arg(short, long, default_value_t = 5)]
+    pub k: usize,
+    /// Words per stored chunk.
+    #[arg(long, default_value_t = 200)]
+    pub chunk_words: usize,
+    /// Overlapping words between consecutive chunks.
+    #[arg(long, default_value_t = 40)]
+    pub overlap_words: usize,
+    /// A label stored on every step row.
+    #[arg(long)]
+    pub label: Option<String>,
+    /// Keep the memory collections after the run instead of deleting them.
+    #[arg(long)]
+    pub keep: bool,
+    /// Stop at the first model error instead of recording it and continuing.
+    #[arg(long)]
+    pub fail_fast: bool,
+    /// Do not write step rows to the run log.
+    #[arg(long)]
+    pub no_record: bool,
+    /// Print the per-codec summaries as JSON.
+    #[arg(long)]
+    pub json: bool,
 }
 
 #[derive(Debug, Args)]

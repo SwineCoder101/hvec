@@ -1098,3 +1098,75 @@ fn payload_stage_shrinks_the_prompt_and_is_recorded() {
     assert!(!bad.status.success());
     assert!(stderr(&bad).contains("unknown payload stage"), "{}", stderr(&bad));
 }
+
+#[test]
+fn memory_script_replays_per_codec_and_accounts_bytes() {
+    let env = Env::new();
+    let script = env.write_doc(
+        "mem.jsonl",
+        concat!(
+            "# memory smoke\n",
+            "{\"id\":\"w1\",\"write\":\"The deploy to eu-west failed with exit code 137.\",\"source\":\"tool:deploy\"}\n",
+            "{\"id\":\"w2\",\"write\":\"The on-call engineer for payments is Priya.\",\"source\":\"tool:search\"}\n",
+            "{\"id\":\"q1\",\"ask\":\"deploy exit code? say exactly 137\",\"answers\":[\"137\"],\"source\":\"tool:deploy\"}\n",
+            "{\"id\":\"w3\",\"write\":\"The rollback succeeded.\",\"source\":\"tool:deploy\"}\n",
+            "{\"id\":\"q2\",\"ask\":\"who is on call for payments? say exactly nobody\",\"answers\":[\"Priya\"],\"source\":\"tool:search\"}\n",
+            "{\"id\":\"q3\",\"ask\":\"anything else?\"}\n",
+        ),
+    );
+    let out = env.run(&[
+        "bench",
+        "memory",
+        "--script",
+        script.to_str().unwrap(),
+        "--codecs",
+        "f32,binary,binary-centred",
+        "-k",
+        "1",
+        "--json",
+    ]);
+    assert_ok(&out, "bench memory");
+    let se = stderr(&out);
+    assert!(se.contains("6 steps (3 writes, 3 asks) × 3 codecs"), "{se}");
+    let summaries: Vec<serde_json::Value> = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(summaries.len(), 3);
+    let f32 = &summaries[0];
+    assert_eq!(f32["codec"], "f32");
+    assert_eq!(f32["writes"], 3);
+    assert_eq!(f32["asks"], 3);
+    assert_eq!(f32["total_chunks"], 3);
+    assert_eq!(f32["total_bytes"], 3 * 128 * 4);
+    assert_eq!(f32["scored"], 2);
+    assert_eq!(f32["contains"], 0.5, "{f32}");
+    assert_eq!(f32["source_hit"], 1.0, "retrieval finds the right memory: {f32}");
+    let bin = &summaries[1];
+    assert_eq!(bin["total_bytes"], 3 * 16);
+    let centred = &summaries[2];
+    assert_eq!(centred["codec"], "binary-centred");
+    assert_eq!(centred["total_bytes"], 3 * 16);
+
+    // Step rows are in the log, with cumulative bytes rising over the writes; memory
+    // collections are deleted at the end.
+    let list = env.run(&["runs", "list", "-n", "50"]);
+    assert_eq!(count_runs(&stdout(&list), "memory"), 18, "{}", stdout(&list));
+    let cols = stdout(&env.run(&["collections", "list"]));
+    assert!(!cols.contains("memory-"), "{cols}");
+    let out = env.run(&[
+        "bench",
+        "memory",
+        "--script",
+        script.to_str().unwrap(),
+        "--codecs",
+        "int8",
+        "--keep",
+        "--no-record",
+    ]);
+    assert_ok(&out, "bench memory --keep");
+    assert!(stdout(&out).contains("int8"), "{}", stdout(&out));
+    let cols = stdout(&env.run(&["collections", "list"]));
+    assert!(cols.contains("memory-") && cols.contains("int8"), "{cols}");
+    assert_eq!(
+        count_runs(&stdout(&env.run(&["runs", "list", "-n", "50"])), "memory"),
+        18
+    );
+}

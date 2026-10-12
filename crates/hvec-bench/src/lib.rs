@@ -4,6 +4,7 @@
 pub mod beir;
 pub mod chunk;
 pub mod judge;
+pub mod memory;
 pub mod metrics;
 pub mod payload;
 pub mod prompt;
