@@ -136,6 +136,20 @@ the tool. Papers are linked by key into the [references]({{ "/references/" | rel
 **Matryoshka embeddings**
 : Embeddings trained so that the first `n` dimensions work on their own. Truncation becomes a
   nearly free codec. See [kusupati2022mrl]({{ "/references/#kusupati2022mrl" | relative_url }}).
+  In hvec, `mrl<k>` keeps the first `k` dimensions and composes with any other codec
+  (`mrl256+int8`); on a model not trained this way the same truncation is a plain lossy
+  projection, which is what the native-versus-post-hoc experiment measures.
+
+**Native low-precision embeddings** versus **post-hoc quantization**
+: A model trained to be truncated or binarised (Matryoshka training, binary-aware training)
+  produces vectors whose small forms were part of the objective. Post-hoc quantization applies a
+  codec to a model that was never trained for it. The question is which gives more retrieval
+  quality per byte; if native wins, the right codec is a different embedding model.
+
+**Task prefix**
+: A marker some retrieval models expect in front of the text (`search_query: `,
+  `search_document: ` for nomic-embed; `query: `, `passage: ` for E5). Configured per embedding
+  profile in hvec as `query_prefix` and `document_prefix`.
 
 **Compression ratio**
 : Bytes of the uncompressed f32 vector divided by bytes of the encoded one. The `Codec` trait
@@ -198,6 +212,20 @@ the tool. Papers are linked by key into the [references]({{ "/references/" | rel
 : Of the `k` nearest neighbours under exact f32 search, the fraction that a codec's top-`k` also
   contains. 1.0 means the compressed ranking agrees perfectly with the baseline. The standard
   retrieval metric, used by [aumuller2020annb]({{ "/references/#aumuller2020annb" | relative_url }}).
+  It measures agreement with f32, not retrieval quality: a codec that swaps two equally relevant
+  passages is penalised as if it had lost one.
+
+**Relevance judgments**, **qrels**
+: Human labels saying which documents are relevant to which queries, the BEIR format being
+  `query-id, corpus-id, score` ([thakur2021beir]({{ "/references/#thakur2021beir" | relative_url }})).
+  hvec question sets carry them as `relevant` lists; `hvec questions import-beir` builds them.
+
+**nDCG@k**, **document recall@k**
+: Retrieval quality against relevance judgments. nDCG (normalised discounted cumulative gain)
+  rewards relevant documents near the top of the ranking, each document counted once at the rank
+  of its first chunk. Document recall@k is the fraction of a query's relevant documents among the
+  top-`k` chunks' documents. Both are reported next to recall@k so that agreement with f32 and
+  quality against the labels can be read side by side.
 
 **Distance error**
 : The difference between a codec's estimated score and the exact f32 score for the same pair.
@@ -213,10 +241,24 @@ the tool. Papers are linked by key into the [references]({{ "/references/" | rel
 
 **LLM-as-judge**
 : Using a language model to grade another model's answers. Scales better than humans and has known
-  biases; see [zheng2023judge]({{ "/references/#zheng2023judge" | relative_url }}).
+  biases; see [zheng2023judge]({{ "/references/#zheng2023judge" | relative_url }}). `hvec judge run`
+  grades recorded answers for correctness and faithfulness; `hvec judge agreement` reports how
+  often the judge and the cheap `exact` / `contains` rules disagree, and in which direction.
+
+**Payload stage**
+: What happens to the retrieved passages between retrieval and the prompt: nothing (`none`), a
+  naive word truncation, or an external compressor such as Headroom reached over HTTP. Recorded
+  per run with the context size before and after, so that key and payload compression can be
+  crossed in one batch.
+
+**Memory loop**, **memory script**
+: An agent that writes tool results and turns into its store and reads them back on later steps.
+  `hvec bench memory` replays a script of `write` and `ask` steps once per codec, measuring bytes
+  stored, latency and answer quality at every step.
 
 **Benchmark matrix**
-: The grid hvec runs: embedding model × codec × chat model × dataset. One run per cell.
+: The grid hvec runs: embedding model × codec × payload stage × chat model × dataset. One run per
+  cell.
 
 **Experiment**
 : A directory under `experiments/` with a hypothesis, a reproducible command, raw results and a
