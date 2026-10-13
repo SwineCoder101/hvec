@@ -4,8 +4,9 @@
 # collections, against two chat models of very different size, then judged by a third.
 #
 # Needs: a built `hvec`, curl, unzip, and chat models. By default two Claude profiles over
-# ANTHROPIC_API_KEY; set SMALL_CHAT / LARGE_CHAT / JUDGE_CHAT to other profile names from the
-# generated config (an Ollama profile is included) to use local models instead.
+# ANTHROPIC_API_KEY. For local models, start `ollama serve`, pull the models, and run with
+#   SMALL_CHAT=ollama-small LARGE_CHAT=ollama-large JUDGE_CHAT=ollama-judge ./run.sh
+# with OLLAMA_SMALL / OLLAMA_LARGE / OLLAMA_JUDGE naming the Ollama models (defaults below).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$HERE/../.."
@@ -16,6 +17,10 @@ EMBEDDER="${EMBEDDER:-bge-small}"
 SMALL_CHAT="${SMALL_CHAT:-haiku}"
 LARGE_CHAT="${LARGE_CHAT:-opus}"
 JUDGE_CHAT="${JUDGE_CHAT:-sonnet}"
+OLLAMA_SMALL="${OLLAMA_SMALL:-llama3.2:3b}"
+OLLAMA_LARGE="${OLLAMA_LARGE:-llama3.1:8b}"
+OLLAMA_JUDGE="${OLLAMA_JUDGE:-$OLLAMA_LARGE}"
+OLLAMA_URL="${OLLAMA_URL:-http://localhost:11434/v1}"
 K="${K:-5}"
 LIMIT="${LIMIT:-}"
 mkdir -p "$WORK/dl" "$HERE/results"
@@ -51,10 +56,22 @@ model = "claude-haiku-5-5"
 api_key_env = "ANTHROPIC_API_KEY"
 max_tokens = 512
 
-[chat.ollama]
+[chat.ollama-small]
 provider = "openai"
-model = "llama3.2:3b"
-base_url = "http://localhost:11434/v1"
+model = "$OLLAMA_SMALL"
+base_url = "$OLLAMA_URL"
+max_tokens = 512
+
+[chat.ollama-large]
+provider = "openai"
+model = "$OLLAMA_LARGE"
+base_url = "$OLLAMA_URL"
+max_tokens = 512
+
+[chat.ollama-judge]
+provider = "openai"
+model = "$OLLAMA_JUDGE"
+base_url = "$OLLAMA_URL"
 max_tokens = 512
 
 [embed.bge-small]

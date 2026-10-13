@@ -3,9 +3,12 @@
 # same questions and chat model. The claim under test: the two layers' effects on answers are
 # independent and additive, or they are not.
 #
-# Needs: a built `hvec`, curl, unzip, a chat model (ANTHROPIC_API_KEY by default; set CHAT to an
-# Ollama profile for a local one) and, for the external-compressor cell, a compressor serving
-# POST {question, passages[]} -> {passages[]} at PAYLOAD_URL (see README.md for a Headroom shim).
+# Needs: a built `hvec`, curl, unzip, a chat model (ANTHROPIC_API_KEY by default; for a local
+# one start `ollama serve` and run with CHAT=ollama-large JUDGE_CHAT=ollama-judge, with
+# OLLAMA_LARGE / OLLAMA_JUDGE naming the models) and, for the external-compressor cell, a
+# compressor serving POST {question, passages[]} -> {passages[]} at PAYLOAD_URL. The extractive
+# stand-in in compress_server.py is one: `python3 compress_server.py 8080 60` then
+# PAYLOAD_URL=http://127.0.0.1:8080/compress.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$HERE/../.."
@@ -15,6 +18,9 @@ QUESTIONS="$ROOT/questions/scifact.jsonl"
 EMBEDDER="${EMBEDDER:-bge-small}"
 CHAT="${CHAT:-sonnet}"
 JUDGE_CHAT="${JUDGE_CHAT:-sonnet}"
+OLLAMA_LARGE="${OLLAMA_LARGE:-llama3.1:8b}"
+OLLAMA_JUDGE="${OLLAMA_JUDGE:-$OLLAMA_LARGE}"
+OLLAMA_URL="${OLLAMA_URL:-http://localhost:11434/v1}"
 K="${K:-5}"
 TRUNCATE_WORDS="${TRUNCATE_WORDS:-60}"
 PAYLOAD_URL="${PAYLOAD_URL:-}"
@@ -40,10 +46,16 @@ model = "claude-sonnet-5-5"
 api_key_env = "ANTHROPIC_API_KEY"
 max_tokens = 512
 
-[chat.ollama]
+[chat.ollama-large]
 provider = "openai"
-model = "llama3.2:3b"
-base_url = "http://localhost:11434/v1"
+model = "$OLLAMA_LARGE"
+base_url = "$OLLAMA_URL"
+max_tokens = 512
+
+[chat.ollama-judge]
+provider = "openai"
+model = "$OLLAMA_JUDGE"
+base_url = "$OLLAMA_URL"
 max_tokens = 512
 
 [embed.bge-small]
