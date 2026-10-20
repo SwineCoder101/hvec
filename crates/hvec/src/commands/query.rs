@@ -45,6 +45,7 @@ pub async fn run(config: &Option<PathBuf>, args: QueryArgs) -> Result<()> {
         question: args.question.clone(),
         answer: outcome.response.text.clone(),
         stop_reason: outcome.response.stop_reason.clone(),
+        attempts: serde_json::to_value(&outcome.response.attempts)?,
         metrics: outcome.metrics.clone(),
     };
     let row = record.into_row();

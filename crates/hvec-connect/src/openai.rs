@@ -161,6 +161,7 @@ impl ChatModel for OpenAiChat {
                 output_tokens: usage.completion_tokens,
             },
             stop_reason: choice.finish_reason,
+            attempts: Vec::new(),
         })
     }
 }

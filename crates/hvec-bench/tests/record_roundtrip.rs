@@ -22,6 +22,10 @@ fn query_record_round_trips_through_store() {
         question: "q?".into(),
         answer: "a.".into(),
         stop_reason: Some("end_turn".into()),
+        attempts: serde_json::json!([
+            {"number": 1, "status": 529, "body": "overloaded", "elapsed_ms": 40, "backoff_ms": 1000, "outcome": "retried"},
+            {"number": 2, "status": 200, "body": "{}", "elapsed_ms": 900, "backoff_ms": null, "outcome": "succeeded"}
+        ]),
         metrics: QueryMetrics {
             k: 3,
             embed_ms: 5,
@@ -55,6 +59,9 @@ fn query_record_round_trips_through_store() {
     assert_eq!(m.k, 3);
     assert_eq!(m.retrieved[0].chunk_id, 7);
     assert_eq!(back.metadata["payload"], "none");
+    assert_eq!(back.metadata["attempts"].as_array().map(Vec::len), Some(2));
+    assert_eq!(back.metadata["attempts"][0]["status"], 529);
+    assert_eq!(back.metadata["attempts"][1]["outcome"], "succeeded");
     // Rows written before the payload stage existed still deserialise.
     let old: QueryMetrics = serde_json::from_str(
         r#"{"k":1,"embed_ms":0,"retrieval_ms":0,"generation_ms":0,"input_tokens":0,"output_tokens":0,"retrieved":[]}"#,

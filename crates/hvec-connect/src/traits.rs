@@ -71,6 +71,34 @@ pub struct Usage {
     pub output_tokens: u64,
 }
 
+/// How one attempt at a provider request ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AttemptOutcome {
+    /// A 2xx reply came back.
+    Succeeded,
+    /// The reply was retryable and another attempt followed.
+    Retried,
+    /// The reply ended the request, either not retryable or the last allowed attempt.
+    Failed,
+}
+
+/// One attempt at a provider request, kept so the run log shows every reply.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Attempt {
+    /// 1-based position in the request's attempt sequence.
+    pub number: u32,
+    /// HTTP status when a reply arrived; `None` when the transport failed.
+    pub status: Option<u16>,
+    /// The raw reply body, or the transport error with its cause chain.
+    pub body: String,
+    /// Wall-clock time of this attempt alone, excluding any backoff.
+    pub elapsed_ms: u64,
+    /// Wait before the next attempt; `None` on the last one.
+    pub backoff_ms: Option<u64>,
+    pub outcome: AttemptOutcome,
+}
+
 /// A completed chat turn.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatResponse {
@@ -79,6 +107,10 @@ pub struct ChatResponse {
     pub model: String,
     pub usage: Usage,
     pub stop_reason: Option<String>,
+    /// Every attempt made for this turn, in order, ending with the one that
+    /// produced it. Empty for connectors that do not retry.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attempts: Vec<Attempt>,
 }
 
 /// A chat completion backend.

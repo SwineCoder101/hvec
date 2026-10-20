@@ -113,6 +113,7 @@ async fn judge_cmd(config: &Option<PathBuf>, args: JudgeArgs) -> Result<()> {
         match outcome {
             Ok((resp, verdict)) => {
                 row.metadata["judge_model_served"] = serde_json::json!(resp.model);
+                row.metadata["attempts"] = serde_json::json!(resp.attempts);
                 row.metadata["reason"] = serde_json::json!(verdict.reason);
                 row.metrics = serde_json::json!({
                     "correct": verdict.correct,

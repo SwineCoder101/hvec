@@ -11,11 +11,12 @@ pub mod hash;
 pub mod local;
 pub mod openai;
 pub mod prefix;
+pub mod retry;
 pub mod traits;
 
 pub use config::{ChatProfile, ChatProvider, Config, EmbedProfile, EmbedProvider};
 pub use error::{ConnectError, Result};
-pub use traits::{ChatModel, ChatRequest, ChatResponse, Embedder, Message, Role, Usage};
+pub use traits::{Attempt, AttemptOutcome, ChatModel, ChatRequest, ChatResponse, Embedder, Message, Role, Usage};
 
 use std::sync::Arc;
 

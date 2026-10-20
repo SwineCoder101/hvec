@@ -68,6 +68,8 @@ pub struct QueryRecord {
     pub question: String,
     pub answer: String,
     pub stop_reason: Option<String>,
+    /// Every provider attempt behind the answer, as the connector reported it.
+    pub attempts: serde_json::Value,
     pub metrics: QueryMetrics,
 }
 
@@ -93,6 +95,7 @@ impl QueryRecord {
             "question": self.question,
             "answer": self.answer,
             "stop_reason": self.stop_reason,
+            "attempts": self.attempts,
         });
         row.metrics = serde_json::to_value(&self.metrics).expect("QueryMetrics serialises to JSON");
         row

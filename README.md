@@ -442,6 +442,17 @@ Or skip the local embedder entirely with `--no-default-features` and use a remot
 **`profile x needs environment variable Y to be set`.** The named profile has an `api_key_env`.
 Export that variable, or remove the key from the profile for servers that need no auth.
 
+**Anthropic: `This API key is not scoped to a workspace`.** User-scoped keys (`sk-ant-usr-…`) must
+name a workspace on every request. Export `ANTHROPIC_WORKSPACE_ID=wrkspc_…` (the id is on the
+workspace page of the Console) and hvec sends it as the `anthropic-workspace-id` header. A
+profile can read a different variable with `workspace_id_env`.
+
+**Anthropic: `gave up after 3 attempts`.** Transport errors and HTTP 408, 409, 429 and 5xx
+replies (including 529 overloaded) are retried with exponential backoff, honouring `retry-after`
+when the server sends it. The message lists each attempt's status and timing, and the run log
+keeps every reply under `metadata.attempts`. Raise or lower the budget per profile with
+`max_attempts`.
+
 **`collection was built with <model>; refusing to mix in <other>`.** Collections are bound to one
 embedding model. Ingest into a new collection name instead.
 

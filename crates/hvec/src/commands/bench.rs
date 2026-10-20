@@ -11,7 +11,7 @@ use std::sync::Arc;
 use hvec_bench::payload::Payload;
 use hvec_bench::questions::{self, Question};
 use hvec_bench::report::{self as rpt, Cell};
-use hvec_connect::{ChatModel, Embedder};
+use hvec_connect::{ChatModel, ConnectError, Embedder};
 
 use crate::cli::{BenchCommand, BenchRunArgs, RecallArgs, ReportArgs};
 use crate::commands::rag::Pipeline;
@@ -128,6 +128,7 @@ async fn run_cmd(config: &Option<PathBuf>, args: BenchRunArgs) -> Result<()> {
                         metadata["chat_model_served"] = serde_json::json!(outcome.response.model);
                         metadata["answer"] = serde_json::json!(outcome.response.text);
                         metadata["stop_reason"] = serde_json::json!(outcome.response.stop_reason);
+                        metadata["attempts"] = serde_json::to_value(&outcome.response.attempts)?;
                         let mut metrics = serde_json::to_value(&outcome.metrics)?;
                         metrics["exact"] = serde_json::json!(score.exact);
                         metrics["contains"] = serde_json::json!(score.contains);
@@ -151,6 +152,9 @@ async fn run_cmd(config: &Option<PathBuf>, args: BenchRunArgs) -> Result<()> {
                     Err(e) => {
                         failures += 1;
                         metadata["error"] = serde_json::json!(format!("{e:#}"));
+                        if let Some(ConnectError::AfterRetries { attempts, .. }) = e.downcast_ref::<ConnectError>() {
+                            metadata["attempts"] = serde_json::json!(attempts);
+                        }
                         eprintln!(
                             "[{done}/{total}] {} · {} · {} → ERROR {e:#}",
                             collection.name, chat_name, q.id

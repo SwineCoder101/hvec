@@ -24,6 +24,11 @@ max_tokens = 4096
 effort = "medium"
 # Route declined requests to a fallback model automatically (Claude API only).
 fallbacks = true
+# Attempts per request. Transport errors and HTTP 408/409/429/5xx are retried with
+# exponential backoff; every attempt's reply is kept in the run log.
+max_attempts = 3
+# User-scoped keys (sk-ant-usr-...) must name a workspace. Set ANTHROPIC_WORKSPACE_ID in the
+# environment, or point a profile at another variable with `workspace_id_env = "..."`.
 
 [chat.anthropic-sonnet]
 provider = "anthropic"

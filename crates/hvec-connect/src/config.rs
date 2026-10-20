@@ -67,10 +67,24 @@ pub struct ChatProfile {
     /// Anthropic only: enable server-side refusal fallbacks on models that support them.
     #[serde(default = "default_true")]
     pub fallbacks: bool,
+    /// Anthropic only: name of the environment variable holding a workspace id. Keys that are
+    /// not scoped to a workspace (user keys) must send one with every request. Defaults to
+    /// `ANTHROPIC_WORKSPACE_ID`; the header is sent only when the variable is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id_env: Option<String>,
+    /// Anthropic only: attempts per request before giving up. Transport errors and HTTP 408,
+    /// 409, 429 and 5xx replies are retried with exponential backoff; other failures end the
+    /// request at once. Every attempt's reply is recorded on the response.
+    #[serde(default = "default_max_attempts")]
+    pub max_attempts: u32,
 }
 
 fn default_max_tokens() -> u32 {
     4096
+}
+
+fn default_max_attempts() -> u32 {
+    crate::retry::DEFAULT_MAX_ATTEMPTS
 }
 
 fn default_true() -> bool {
@@ -236,6 +250,8 @@ mod tests {
         assert!(cfg.chat.contains_key(&cfg.default_chat));
         assert!(cfg.embed.contains_key(&cfg.default_embedder));
         assert_eq!(cfg.chat["anthropic"].provider, ChatProvider::Anthropic);
+        assert_eq!(cfg.chat["anthropic"].max_attempts, 3);
+        assert_eq!(cfg.chat["anthropic-sonnet"].max_attempts, 3);
         assert_eq!(cfg.embed["local"].provider, EmbedProvider::Local);
     }
 
