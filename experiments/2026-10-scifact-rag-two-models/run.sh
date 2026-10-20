@@ -10,6 +10,8 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$HERE/../.."
+# Secrets live in the repo-root .env (git-ignored); exported variables take precedence.
+if [ -f "$ROOT/.env" ]; then set -a; . "$ROOT/.env"; set +a; fi
 HVEC="${HVEC:-$ROOT/target/release/hvec}"
 WORK="${WORK:-$HERE/work}"
 QUESTIONS="$ROOT/questions/scifact.jsonl"

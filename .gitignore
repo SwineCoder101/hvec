@@ -7,3 +7,4 @@
 .fastembed_cache/
 .DS_Store
 experiments/*/work/
+.env
