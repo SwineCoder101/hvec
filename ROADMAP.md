@@ -93,12 +93,45 @@ disagree.
   model: [a research note](docs/_posts/2026-10-12-encrypted-similarity-cost-model.md) with the
   numbers. No code; the note says why not yet.
 
+## Phase 7 · Learned rotation before quantization
+
+The binary write-ups blamed the lost recall on geometry, not on bit depth: BGE vectors share a
+large common component and their variance is spread unevenly over the axes, so one sign bit per
+dimension wastes most of its resolution. Centring removed the common component and recovered
+only four or five points. A rotation applied after embedding and before the codec spreads the
+variance evenly over the axes, which is what a sign bit or a PQ subspace needs. This is the
+cheap alternative to training a codec-robust embedding model: the model stays fixed, and the
+rotation is a `d × d` matrix fitted on the corpus.
+
+- [ ] A `rot` stage that composes like `mrl<k>` does: `rot+binary`, `rot+binary-centred`,
+  `rot+pq48`, `mrl256+rot+binary`. It is a trained codec in the existing sense: `fit` learns the
+  rotation on the first ingest, `params` stores the matrix (or the seed) with the collection,
+  and `score` rotates the f32 query once per search before the asymmetric scan, so the stored
+  side still scores on the bytes.
+- [ ] Two fits behind the same name. `rot` with a seed is a random orthogonal rotation
+  (RaBitQ-style, a Haar-random matrix from the QR of a Gaussian), which needs no corpus pass and
+  gives a baseline for how much the learned one buys. `rot:itq` is Iterative Quantization: PCA
+  to the target dimension, then alternate between the sign bits and the orthogonal Procrustes
+  solution until the quantization error stops falling.
+- [ ] **Experiment 4**: `binary`, `binary-centred`, `rot+binary` and `rot:itq+binary` at 48
+  bytes, and `pq48` against `rot:itq+pq48`, on SciFact against the judgments with the f32
+  ceiling in the same table. The claim under test: a rotation closes most of the gap between
+  post-hoc binary and the f32 ceiling without touching the embedding model. The number to beat
+  is binary's 4.4 points of nDCG@10. If it does not, the write-up says how far short, and
+  whether training the embedder for the codec (Matryoshka-style, with the sign function in the
+  loss) is the only way left.
+- [ ] Symmetric scoring for the rotated binary codec: binarise the rotated query too and score
+  by Hamming distance with popcount. This is the first codec path where a speed claim is
+  possible, so the write-up has to include scan time at equal bytes against the asymmetric path.
+
+Exit: Experiment 4 published, and a stated answer to whether rotation makes binary usable on
+this embedding model.
+
 ## Next
 
 - Run Experiments 1 and 3 and the judge re-scoring as soon as two chat models are reachable;
   the scripts need only `ANTHROPIC_API_KEY` (or an Ollama server) and a built `hvec`.
-- Codec follow-ups the write-ups flagged: a per-vector scale for `binary-centred`, a rotation
-  before the sign bits (ITQ or random, RaBitQ-style), optimised PQ with a learned rotation, and a
+- Codec follow-ups the write-ups flagged: a per-vector scale for `binary-centred`, and a
   rescoring stage (fetch 5-10× candidates by codec, re-rank with int8 or f32).
 - A second corpus with graded, denser judgments than SciFact's.
 
