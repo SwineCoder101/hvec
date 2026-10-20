@@ -1,0 +1,44 @@
+db_path = "/Users/liam/dev/hvec/experiments/2026-10-scifact-rag-two-models/work/hvec.db"
+default_chat = "ollama-large"
+default_embedder = "bge-small"
+metric = "cosine"
+
+[chat.opus]
+provider = "anthropic"
+model = "claude-opus-5-5"
+api_key_env = "ANTHROPIC_API_KEY"
+max_tokens = 512
+
+[chat.sonnet]
+provider = "anthropic"
+model = "claude-sonnet-5-5"
+api_key_env = "ANTHROPIC_API_KEY"
+max_tokens = 512
+
+[chat.haiku]
+provider = "anthropic"
+model = "claude-haiku-5-5"
+api_key_env = "ANTHROPIC_API_KEY"
+max_tokens = 512
+
+[chat.ollama-small]
+provider = "openai"
+model = "llama3.2:3b"
+base_url = "http://localhost:11434/v1"
+max_tokens = 512
+
+[chat.ollama-large]
+provider = "openai"
+model = "llama3.1:8b"
+base_url = "http://localhost:11434/v1"
+max_tokens = 512
+
+[chat.ollama-judge]
+provider = "openai"
+model = "llama3.1:8b"
+base_url = "http://localhost:11434/v1"
+max_tokens = 512
+
+[embed.bge-small]
+provider = "local"
+model = "BGESmallENV15"

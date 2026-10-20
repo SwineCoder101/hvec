@@ -1,0 +1,10 @@
+{
+  "n": 16,
+  "judge_true": 3,
+  "exact_true": 0,
+  "contains_true": 1,
+  "agree_exact": 0.8125,
+  "agree_contains": 0.875,
+  "judge_only": 2,
+  "contains_only": 0
+}
