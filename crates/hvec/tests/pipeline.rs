@@ -121,6 +121,10 @@ fn anthropic_wire_format_is_correct() {
         r.headers.get("anthropic-beta").map(String::as_str),
         Some("server-side-fallback-2026-07-01")
     );
+    assert!(
+        !r.headers.contains_key("anthropic-workspace-id"),
+        "no ANTHROPIC_WORKSPACE_ID set, so no workspace header"
+    );
     assert_eq!(r.body["model"], "claude-opus-5-5");
     assert_eq!(r.body["fallbacks"], "default");
     assert_eq!(r.body["output_config"]["effort"], "medium");
@@ -138,6 +142,25 @@ fn anthropic_wire_format_is_correct() {
         "two passages expected: {user}"
     );
     assert!(user.ends_with("Question: refund?"), "{user}");
+}
+
+#[test]
+fn anthropic_sends_the_workspace_header_when_the_variable_is_set() {
+    let env = Env::new();
+    ingest_two_docs(&env);
+    let out = env
+        .hvec()
+        .args(["query", "refund?", "--collection", "docs", "-k", "1"])
+        .env("ANTHROPIC_WORKSPACE_ID", "wrkspc_01ABC")
+        .output()
+        .expect("run hvec");
+    assert_ok(&out, "query");
+    let reqs = env.server.anthropic_requests();
+    assert_eq!(reqs.len(), 1);
+    assert_eq!(
+        reqs[0].headers.get("anthropic-workspace-id").map(String::as_str),
+        Some("wrkspc_01ABC")
+    );
 }
 
 #[test]
