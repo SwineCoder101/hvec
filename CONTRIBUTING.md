@@ -43,7 +43,8 @@ cargo build -p hvec --no-default-features   # the remote-only build must keep co
 ```
 
 Formatting is settled by the `rustfmt.toml` at the root (120 columns). On macOS, if the link step
-fails on CoreML symbols, see the Troubleshooting section of the README for the `SDKROOT` fix.
+fails on CoreML symbols even though Xcode.app is installed, see the Troubleshooting section of the
+README for the `SDKROOT` fix.
 
 ## Where things go
 

@@ -428,7 +428,10 @@ latency, tokens and the answer scores, followed by a per-codec summary.
 
 **macOS: linker error about `MLComputePlan` or `MLOptimizationHints`.** The prebuilt ONNX Runtime
 that the local embedder uses needs the macOS 14.4 SDK or newer. Older Command Line Tools ship
-SDK 14.0. Either update the Command Line Tools, or point the build at a newer SDK from Xcode:
+SDK 14.0. The build scripts of `hvec` and `hvec-connect` handle the common case: when the default
+SDK is too old and Xcode.app has a newer one, they pass that SDK to the linker (see
+`crates/hvec-connect/build/macos_sdk.rs`). If that still fails, update the Command Line Tools, or
+point the build at a newer SDK yourself; an explicit `SDKROOT` always wins over the probe:
 
 ```sh
 export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)        # if xcode-select points at Xcode
