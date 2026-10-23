@@ -148,6 +148,31 @@ The benchmark is a matrix: **embedding model × codec × payload stage × chat m
 (dimension, distribution, normalisation). Tolerance to degraded retrieval depends on the chat
 model. hvec keeps every axis explicit in every run record.
 
+## Embedding models and how they are indexed
+
+Every vector in hvec is a sentence or passage embedding from a small transformer, not a classic
+word vector (word2vec, GloVe). The models used so far:
+
+| Profile | Model | Dims | Used in |
+|---|---|---|---|
+| `local` (default) | `bge-small-en-v1.5`, Xenova ONNX via fastembed on CPU, no task prefixes | 384 | Every SciFact experiment |
+| `local` | `all-MiniLM-L6-v2`, Qdrant ONNX via fastembed on CPU | 384 | int8/binary, mean-centred binary and labelled SciFact experiments, as the second model |
+| `local` (also the `ollama` profile) | `nomic-embed-text-v1.5`, Matryoshka-trained, needs `search_query: ` / `search_document: ` prefixes | 768 | Native low precision against post-hoc quantization |
+| `openai` | `text-embedding-3-small` | 1536 | Configured, not yet run |
+| `hash` | `hash-256`, deterministic word hashing with no semantics | 256 | Tests and CI only, never a benchmark |
+
+Run `hvec embedders` for every local model the build can download.
+
+**There is no ANN index.** Each collection is a SQLite table of chunks; the `vector` column holds
+the codec-encoded bytes (f32, int8, binary, `pq48`, `mrl256+int8`, …) and the collection row
+records the embedding model, dimension, codec, codec parameters and metric that built it. A query
+is embedded once in f32 and scored against every stored code by a brute-force scan in the
+compressed domain, with no decode step; the top `k` by the metric's direction are returned. That
+is deliberate: hvec measures what the codec does to recall and score error, and an HNSW or IVF
+index would add its own approximation on top. The scan is cheap at this scale (about 4 ms per
+query over the 8,036-vector SciFact corpus in f32, 2 ms in int8 or binary) and is recorded with
+every run, so the cost of a codec's scoring kernel is still visible.
+
 ## Getting started
 
 You need a stable Rust toolchain (1.85 or newer). Install it with [rustup](https://rustup.rs).
