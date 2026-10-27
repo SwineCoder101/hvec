@@ -11,9 +11,12 @@
     "max_abs_score_error": 0.0,
     "bytes_per_vector": 1536,
     "compression_ratio": 1.0,
-    "encode_ms": 1,
-    "scan_ms": 1203,
-    "baseline_scan_ms": 900
+    "encode_ms": 3,
+    "scan_ms": 2526,
+    "baseline_scan_ms": 2117,
+    "labelled_queries": 0,
+    "ndcg_at_k": null,
+    "doc_recall_at_k": null
   },
   {
     "codec": "int8",
@@ -23,13 +26,16 @@
     "queries": 300,
     "recall_at_k": 0.9976666666666667,
     "top1_agreement": 1.0,
-    "mean_abs_score_error": 0.0002704102946611886,
-    "max_abs_score_error": 0.0019462145864963531,
+    "mean_abs_score_error": 0.00027040489104296415,
+    "max_abs_score_error": 0.0019461773335933685,
     "bytes_per_vector": 392,
     "compression_ratio": 3.9183674,
-    "encode_ms": 2,
-    "scan_ms": 600,
-    "baseline_scan_ms": 899
+    "encode_ms": 11,
+    "scan_ms": 905,
+    "baseline_scan_ms": 2110,
+    "labelled_queries": 0,
+    "ndcg_at_k": null,
+    "doc_recall_at_k": null
   },
   {
     "codec": "binary",
@@ -39,12 +45,34 @@
     "queries": 300,
     "recall_at_k": 0.7200000000000002,
     "top1_agreement": 0.7433333333333333,
-    "mean_abs_score_error": 0.03667144736456826,
-    "max_abs_score_error": 0.2182382047176361,
+    "mean_abs_score_error": 0.036671437976540495,
+    "max_abs_score_error": 0.21823814511299133,
     "bytes_per_vector": 48,
     "compression_ratio": 32.0,
-    "encode_ms": 11,
-    "scan_ms": 596,
-    "baseline_scan_ms": 899
+    "encode_ms": 10,
+    "scan_ms": 3707,
+    "baseline_scan_ms": 2107,
+    "labelled_queries": 0,
+    "ndcg_at_k": null,
+    "doc_recall_at_k": null
+  },
+  {
+    "codec": "binary-centred",
+    "metric": "cosine",
+    "k": 10,
+    "vectors": 8036,
+    "queries": 300,
+    "recall_at_k": 0.7416666666666671,
+    "top1_agreement": 0.78,
+    "mean_abs_score_error": 0.03909161308820589,
+    "max_abs_score_error": 0.2401924729347229,
+    "bytes_per_vector": 48,
+    "compression_ratio": 32.0,
+    "encode_ms": 10,
+    "scan_ms": 4431,
+    "baseline_scan_ms": 2122,
+    "labelled_queries": 0,
+    "ndcg_at_k": null,
+    "doc_recall_at_k": null
   }
 ]

@@ -31,7 +31,7 @@ agreement on bge-small in the previous experiment, recovers 0.4 nDCG points ther
 | Codecs | `f32`, `int8`, `binary`, `binary-centred` (fitted on all 8,036 corpus vectors) |
 | Label metrics | nDCG@k over documents, binary relevance, each abstract counted once at the rank of its first chunk; document recall@k, the fraction of a claim's judged abstracts among the top-k chunks' documents |
 | Search | brute force, no index, no rescoring |
-| Hardware | Apple M4 Pro, 14 cores, release build |
+| Hardware | Apple M4 Pro, 14 cores, release build. Reproduced on an Intel Core i9-9980HK under Linux at commit `cc9a5eb`; see [Reproduction](#reproduction) |
 | Code | hvec commit `6a78bf9` |
 | Command | `./run.sh` in this directory (downloads data and models on first run) |
 
@@ -76,6 +76,7 @@ The loss in the labelled metric, relative to f32:
 | document recall lost by `binary` | 6.1 % | 5.7 % | 4.4 % | 5.0 % |
 
 Raw output for every row is in `results/`, one JSON file per (model, k), with the run config.
+The committed JSON is from the Linux reproduction below; the tables above are unchanged by it.
 
 ## Discussion
 
@@ -120,6 +121,29 @@ points below the published BEIR numbers for these models because the corpus is c
 no instruction prefix. The chunking is held fixed because the RAG pipeline under test uses it.
 And still no chat model: whether a 4-point nDCG loss changes answers is the question the next
 experiment, with a question set that now carries gold verdicts, exists to answer.
+
+## Reproduction
+
+Run again on 2026-10-27 from a clean checkout at commit `cc9a5eb` on a different machine: Intel
+Core i9-9980HK (8 cores, 16 threads), 61 GB, Linux 7.0, Rust 1.99.1, release build. Models and
+corpus were downloaded fresh and the corpus re-ingested (309 s for bge-small, 126 s for MiniLM
+on CPU). Command: `WORK=../2026-10-scifact-int8-binary/work ./run.sh`, reusing the two
+collections that experiment had just built.
+
+Every nDCG@k and document recall@k above matches to four decimals, at both k. Agreement with f32
+matches to three decimals; the one change is MiniLM int8 at k=10, where top-1 agreement is 0.997
+instead of 1.000 (one query in 300) and recall@10 is 0.9947 instead of 0.995. Score errors differ
+in the sixth or seventh decimal. All of this is ONNX Runtime producing embeddings that differ in
+the last bits between Apple silicon and x86.
+
+The scan timings do not reproduce and the ordering between codecs changed. On the M4 Pro binary
+scanned in a third of f32's time (433 ms against 1203 ms for 300 queries); on the i9 it takes a
+third longer (3938 ms against 2871 ms), and binary-centred longer still (4610 ms), while int8
+keeps a three-fold advantage on both (926 ms here). hvec scores binary asymmetrically, unpacking
+each sign bit to a float against the f32 query, and that unpacking is cheap on one compiler
+target and not on the other. This is why the README makes no speed claim for any codec; a speed
+claim for binary needs the symmetric Hamming path on the roadmap. Written up in the blog post
+[Reproduced on a second machine](https://swinecoder101.github.io/hvec/blog/2026/10/27/scifact-labelled-reproduced/).
 
 **Next.** Run the question set through `bench run` against two chat models on the f32, int8,
 binary and binary-centred collections (the roadmap's Experiment 1). The claim under test is

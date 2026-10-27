@@ -8,6 +8,8 @@ references: [thakur2021beir, xiao2023bge, reimers2019sbert, charikar2002simhash,
 *Full write-up, raw results and a one-command reproduction are in the repository:*
 [experiments/2026-10-scifact-labelled](https://github.com/SwineCoder101/hvec/tree/main/experiments/2026-10-scifact-labelled).
 Follow-up to [SciFact: mean-centred binary]({{ "/experiments/scifact-centred-binary/" | relative_url }}).
+*Reproduced on a second machine on 2026-10-27, every labelled metric matching to four decimals:*
+[Reproduced on a second machine]({{ "/blog/2026/10/27/scifact-labelled-reproduced/" | relative_url }}).
 
 **Hypothesis.** Agreement with the f32 ranking overstates a binary codec's retrieval loss,
 because the neighbours it reorders are near-ties, and near-ties are rarely the judged-relevant
