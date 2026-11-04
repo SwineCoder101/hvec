@@ -21,16 +21,23 @@ Two ways to make compression adaptive, crossed with the hybrid (two-stage) retri
 2. At the same mean number of re-scored candidates, adaptive depth beats a fixed depth,
    mostly by rescuing the worst queries.
 
-**Result.** Both confirmed, and the first more strongly than expected.
+**Result.** The first is confirmed, more strongly than expected. The second is confirmed only
+in its weak form: the gain is real and almost always positive, but small.
 - **Adaptive bits beat PQ on average.** `mixed48-pca-w` keeps 0.768 of the exact top 10 with no
   re-scoring, against 0.747 for `pq48` and 0.669 for `binary`. It wins at 24 and 96 bytes too.
   The gain is all on MiniLM (+4.4 points); on bge-small the two tie (0.723 vs 0.724), and `pq48`
   keeps a slightly smaller nDCG loss (0.0160 vs 0.0177).
 - **The rotation is what makes it work.** Without it, `mixed48` (0.696) is no better than
   `binary-centred` (0.698).
-- **Adaptive depth beats fixed depth at equal mean depth in 522 of 526 cells.** On average it
-  adds 1.5 points of recall@10 and 3.7 points of worst-decile recall, with no change in nDCG.
-  The price is variable work: the 90th-percentile query re-scores 1.3 to 2.1× the mean.
+- **Adaptive depth beats fixed depth at equal mean depth, but only by 0.25 to 0.6 points of
+  recall@10.** It is ahead in 156 of 180 comparisons. Its gain is larger for the worst queries:
+  worst-decile recall rises by 4.1 points at a 1σ margin. The price is variable work: the
+  90th-percentile query re-scores 1.3 to 2.1× the mean. *Correction:* the first version of this
+  write-up reported +1.5 points of recall (and +3.7 worst-decile) from comparing against fixed
+  depths of only 20, 50 and 100. Interpolating between such sparse points runs below the true
+  fixed-depth curve, which bends, and so flattered the margin policy by about 3×. The numbers
+  here use the per-query traces from the [routing experiment](../2026-11-routing-oracle/),
+  which score a fixed depth at exactly the margin's mean depth.
 - **The two combine.** `mixed48-pca-w` with a 1σ margin re-scores 19 candidates on average and
   keeps 0.929 of the top 10. `binary` with a fixed 20 keeps 0.841 for the same bytes.
 
@@ -94,20 +101,20 @@ at int8's own recall. At depth 100: `binary` 0.974 against 0.981, `pq48` 0.989 a
 
 ### Adaptive depth against fixed depth at the same mean depth
 
-Each margin cell is compared with the fixed-depth curve of the same collection and codec,
-interpolated in log depth at the margin's mean depth. Cells whose mean depth falls outside the
-measured fixed range (20 to 100) are left out.
+With an f32 second stage, a query's recall at any depth is the share of its true neighbours the
+scan ranks within that depth. The routing experiment's traces record those ranks for six of the
+scan codecs here (`binary`, `binary-centred`, `pq24`, `pq48`, `mixed24-pca-w`, `mixed48-pca-w`)
+on all ten collections. So a fixed depth can be scored at exactly the margin policy's mean
+depth, interpolating only between neighbouring whole numbers.
 
-| margin | cells compared | Δ recall@10 | Δ worst decile | Δ nDCG | p90 depth / mean depth |
-|---|---:|---:|---:|---:|---:|
-| 1σ | 218 | +0.020 | +0.048 | +0.001 | 1.29–1.60 |
-| 2σ | 192 | +0.014 | +0.033 | +0.000 | 1.39–1.94 |
-| 3σ | 116 | +0.008 | +0.025 | +0.000 | 1.49–2.09 |
-| all | 526 | **+0.015** | **+0.037** | 0.000 | |
+| margin | comparisons | mean depth | Δ recall@10 | ahead in | Δ worst decile | p90 depth / mean depth |
+|---|---:|---:|---:|---:|---:|---:|
+| 1σ | 60 | 27 | +0.006 | 48 / 60 | **+0.041** | 1.29–1.60 |
+| 2σ | 60 | 73 | +0.006 | 59 / 60 | +0.020 | 1.39–1.94 |
+| 3σ | 60 | 163 | +0.003 | 49 / 60 | +0.007 | 1.49–2.09 |
 
-Adaptive is ahead in 522 of the 526 cells. The gain is largest at small depths and for the
-better scan codecs (`pq96` and `mixed96-pca-w` gain 3.1 to 3.3 points at a 1σ margin), and it
-shrinks as the depth grows and every policy approaches full recall.
+The nDCG change is zero to three decimals at every margin, in the matrix's own cells. Section 3 of `results/summary.txt` is the original, sparse comparison, kept for the
+record; it overstates the gain for the reason above.
 
 ### Benefits and drawbacks of each combination
 
@@ -119,10 +126,10 @@ candidates.
 |---|---|---:|---:|---:|---|---|
 | `binary`, no re-score | 48 B | 0.669 | 0.41 | 0.024 | Stateless, nothing to fit | Loses a third of the top 10; its asymmetric score is no faster than f32 |
 | `pq48`, no re-score | 48 B (+ codebooks) | 0.747 | 0.52 | 0.016 | Best nDCG at 48 B with no re-score | k-means fit per collection; codebooks to store; refit when the corpus drifts |
-| `mixed48-pca-w`, no re-score | 48 B (+ a 384 × 384 rotation) | 0.768 | 0.55 | 0.018 | Best recall at 24, 48 and 96 B; PCA fit, no iterative clustering | Ties PQ on bge-small and loses slightly on nDCG; one matrix–vector product per query; refit on drift |
+| `mixed48-pca-w`, no re-score | 48 B (+ a 384 × 384 rotation) | 0.768 | 0.55 | 0.018 | Best recall at 24, 48 and 96 B; PCA fit, no iterative clustering | Ties PQ on bge-small and loses slightly on nDCG; its scan is 2.2× slower per vector than f32 ([zero-copy scan](../2026-11-zero-copy-scan/)); refit on drift |
 | hybrid, fixed depth, int8 | 48 B RAM + 392 B disk | 0.944–0.983 at depth 50 | 0.84–0.97 | ≈ 0 | Second store 4× smaller than f32 | Levels off at int8's own 0.99; random reads per query |
 | hybrid, fixed depth, f32 | 48 B RAM + 1,536 B disk | 0.948–0.991 at depth 50 | 0.86–0.98 | ≈ 0 | Reaches exact; the depth is predictable from noise ÷ band | Keeps a full f32 copy; N random reads per query |
-| hybrid, adaptive depth | as above | +0.015 over fixed at equal mean depth | +0.037 | ≈ 0 | Fewer bad queries for the same average work | Variable work per query (p90 1.3–2.1× the mean); σ calibrated per collection; one more parameter |
+| hybrid, adaptive depth | as above | +0.003 to +0.006 over fixed at equal mean depth | +0.007 to +0.041 | ≈ 0 | Fewer bad queries for the same average work | A small gain for variable work per query (p90 1.3–2.1× the mean); σ calibrated per collection; one more parameter |
 | adaptive bits + adaptive depth (`mixed48-pca-w`, 1σ) | 48 B RAM + 1,536 B disk | 0.929 at mean depth 19 | | ≈ 0 | The best recall per candidate re-scored of any 48-byte scan | Every drawback above together: two fits, a rotation and variable depth |
 
 ## Discussion
@@ -141,11 +148,12 @@ principal component has to spend bits on it. The `-w` allocation does spend bits
 last components in the [README animation](../../docs/assets/animations/adaptive-bits.svg).
 Centring the rotation, or giving the mean its own exact term, is the obvious next variant.
 
-**Adaptive depth is a small, reliable win, not a large one.** 1.5 points at equal work, larger
-for the worst queries, and almost never negative. The [routing experiment](../2026-11-routing-oracle/)
-asks how much more a better router could get. A hindsight oracle shows about 6 points of
-headroom, but the band a router can see from the scan's own scores tracks the true band only
-moderately, so most of that headroom is out of reach.
+**Adaptive depth is a small, reliable win, not a large one.** Half a point of recall at equal
+work, up to four points for the worst decile of queries, and rarely negative. The
+[routing experiment](../2026-11-routing-oracle/) asks how much more a better router could get.
+A hindsight oracle shows about 6 points of headroom, but the band a router can see from the
+scan's own scores tracks the true band only moderately (Spearman 0.52 to 0.70), and no router
+built on it captured more than 6% of the headroom.
 
 **Caveats.**
 - **Recall is against exact f32, not the answer.** nDCG uses binary relevance. Whether any of
