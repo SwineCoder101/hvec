@@ -32,4 +32,5 @@ for c in $CORPORA; do
     echo "== $col done"
   done
 done
+gzip -9f "$HERE"/results/traces/*.jsonl
 python3 -I "$HERE/analyse.py" "$HERE/results/traces" "$K" | tee "$HERE/results/summary.txt"

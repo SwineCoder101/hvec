@@ -16,6 +16,7 @@ per-collection question: predict each collection's cheapest (scan codec, fixed d
 target from noise ÷ band, with the curve fitted on the other corpora, and check it.
 """
 
+import gzip
 import json
 import math
 import sys
@@ -118,7 +119,12 @@ def at_budget(curve, budget):
 
 
 def main(traces_dir: Path, k: int) -> None:
-    traces = [Trace(l) for p in sorted(traces_dir.glob("*.jsonl")) for l in p.read_text().splitlines() if l.strip()]
+    def lines(p):
+        text = gzip.decompress(p.read_bytes()).decode() if p.suffix == ".gz" else p.read_text()
+        return [l for l in text.splitlines() if l.strip()]
+
+    files = sorted(traces_dir.glob("*.jsonl")) + sorted(traces_dir.glob("*.jsonl.gz"))
+    traces = [Trace(l) for p in files for l in lines(p)]
     print(f"{len(traces)} (collection, scan codec) traces, {sum(t.n for t in traces)} query traces in all\n")
 
     # Does the scan's own band track the exact one, query by query?
