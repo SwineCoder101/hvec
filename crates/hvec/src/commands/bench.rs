@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context as _, Result, bail};
 use hvec_bench::recall::{self, RecallQuery, RecallReport};
+use hvec_bench::rescore;
 use hvec_core::codecs::F32Codec;
 use hvec_core::{Codec, codec_by_name};
 use hvec_store::RunRow;
@@ -13,13 +14,14 @@ use hvec_bench::questions::{self, Question};
 use hvec_bench::report::{self as rpt, Cell};
 use hvec_connect::{ChatModel, ConnectError, Embedder};
 
-use crate::cli::{BenchCommand, BenchRunArgs, RecallArgs, ReportArgs};
+use crate::cli::{BenchCommand, BenchRunArgs, RecallArgs, ReportArgs, RescoreArgs};
 use crate::commands::rag::Pipeline;
 use crate::context::Ctx;
 
 pub async fn run(config: &Option<PathBuf>, cmd: BenchCommand) -> Result<()> {
     match cmd {
         BenchCommand::Recall(args) => recall_cmd(config, args).await,
+        BenchCommand::Rescore(args) => rescore_cmd(config, args).await,
         BenchCommand::Run(args) => run_cmd(config, args).await,
         BenchCommand::Memory(args) => crate::commands::memory::run(config, args).await,
     }
@@ -309,62 +311,16 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
         vectors.push(baseline.decode(&enc)?);
     }
 
-    let (queries, query_source) = match (&args.queries, &args.questions) {
-        (_, Some(path)) => {
-            let qs = questions::load(path)?;
-            let texts: Vec<String> = qs.iter().map(|q| q.retrieval_text().to_owned()).collect();
-            let embedder = hvec_connect::embedder(&ctx.config, &collection.embed_profile).await?;
-            let vectors = embedder.embed_queries(&texts).await?;
-            let labelled = qs.iter().filter(|q| !q.relevant.is_empty()).count();
-            let queries: Vec<RecallQuery> = vectors
-                .into_iter()
-                .zip(qs)
-                .map(|(vector, q)| RecallQuery {
-                    vector,
-                    exclude: None,
-                    relevant: q.relevant,
-                })
-                .collect();
-            let n = queries.len();
-            (
-                queries,
-                format!(
-                    "questions:{} ({n} questions, {labelled} with judgments)",
-                    path.display()
-                ),
-            )
-        }
-        (Some(path), None) => {
-            let text = tokio::fs::read_to_string(path)
-                .await
-                .with_context(|| format!("reading {}", path.display()))?;
-            let lines: Vec<String> = text
-                .lines()
-                .map(str::trim)
-                .filter(|l| !l.is_empty())
-                .map(str::to_owned)
-                .collect();
-            if lines.is_empty() {
-                bail!("{} has no queries", path.display());
-            }
-            let embedder = hvec_connect::embedder(&ctx.config, &collection.embed_profile).await?;
-            let qs = embedder
-                .embed_queries(&lines)
-                .await?
-                .into_iter()
-                .map(|vector| RecallQuery {
-                    vector,
-                    exclude: None,
-                    relevant: Vec::new(),
-                })
-                .collect();
-            (qs, format!("file:{}", path.display()))
-        }
-        (None, None) => (
-            recall::self_queries(&ids, &vectors, args.sample),
-            format!("self-queries:{}", args.sample.min(vectors.len())),
-        ),
-    };
+    let (queries, query_source) = load_queries(
+        &ctx,
+        &collection.embed_profile,
+        args.queries.as_ref(),
+        args.questions.as_ref(),
+        args.sample,
+        &ids,
+        &vectors,
+    )
+    .await?;
 
     let mut names: Vec<String> = vec!["f32".to_owned()];
     names.extend(args.codecs.iter().filter(|c| c.as_str() != "f32").cloned());
@@ -423,12 +379,13 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
     println!();
     let labelled = reports.first().is_some_and(|r| r.labelled_queries > 0);
     println!(
-        "{:<15} {:>9} {:>7} {:>10} {:>10} {:>8} {:>7} {:>9} {:>8}{}",
+        "{:<15} {:>9} {:>7} {:>10} {:>10} {:>9} {:>8} {:>7} {:>9} {:>8}{}",
         "codec",
         "recall@k",
         "top1",
         "mean err",
         "max err",
+        "rank noise",
         "bytes",
         "ratio",
         "encode ms",
@@ -437,12 +394,13 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
     );
     for r in &reports {
         println!(
-            "{:<15} {:>9.4} {:>7.3} {:>10.5} {:>10.5} {:>8} {:>6.1}x {:>9} {:>8}{}",
+            "{:<15} {:>9.4} {:>7.3} {:>10.5} {:>10.5} {:>9.5} {:>8} {:>6.1}x {:>9} {:>8}{}",
             r.codec,
             r.recall_at_k,
             r.top1_agreement,
             r.mean_abs_score_error,
             r.max_abs_score_error,
+            r.rank_noise,
             r.bytes_per_vector,
             r.compression_ratio,
             r.encode_ms,
@@ -453,6 +411,12 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
             }
         );
     }
+    if let Some(r) = reports.first() {
+        println!(
+            "\nneighbour spacing (exact f32, median over queries): rank k to k+1 {:.5}, rank k to 2k {:.5}; rank noise is the codec's score error std over the exact top-2k, per-query bias removed",
+            r.boundary_gap, r.neighbour_band
+        );
+    }
     if labelled {
         println!(
             "\nndcg@k and doc rec are against the question set's relevance judgments ({} labelled queries); the f32 row is the ceiling the codec is measured against",
@@ -461,6 +425,254 @@ async fn recall_cmd(config: &Option<PathBuf>, args: RecallArgs) -> Result<()> {
     }
     if !args.no_record {
         eprintln!("\n{} runs recorded (kind: recall)", reports.len());
+    }
+    Ok(())
+}
+
+/// The queries for `bench recall` and `bench rescore`: a question set, a
+/// file of query lines, or self-queries sampled from the collection.
+async fn load_queries(
+    ctx: &Ctx,
+    embed_profile: &str,
+    queries: Option<&PathBuf>,
+    questions: Option<&PathBuf>,
+    sample: usize,
+    ids: &[i64],
+    vectors: &[Vec<f32>],
+) -> Result<(Vec<RecallQuery>, String)> {
+    Ok(match (queries, questions) {
+        (_, Some(path)) => {
+            let qs = questions::load(path)?;
+            let texts: Vec<String> = qs.iter().map(|q| q.retrieval_text().to_owned()).collect();
+            let embedder = hvec_connect::embedder(&ctx.config, embed_profile).await?;
+            let vectors = embedder.embed_queries(&texts).await?;
+            let labelled = qs.iter().filter(|q| !q.relevant.is_empty()).count();
+            let queries: Vec<RecallQuery> = vectors
+                .into_iter()
+                .zip(qs)
+                .map(|(vector, q)| RecallQuery {
+                    vector,
+                    exclude: None,
+                    relevant: q.relevant,
+                })
+                .collect();
+            let n = queries.len();
+            (
+                queries,
+                format!(
+                    "questions:{} ({n} questions, {labelled} with judgments)",
+                    path.display()
+                ),
+            )
+        }
+        (Some(path), None) => {
+            let text = tokio::fs::read_to_string(path)
+                .await
+                .with_context(|| format!("reading {}", path.display()))?;
+            let lines: Vec<String> = text
+                .lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty())
+                .map(str::to_owned)
+                .collect();
+            if lines.is_empty() {
+                bail!("{} has no queries", path.display());
+            }
+            let embedder = hvec_connect::embedder(&ctx.config, embed_profile).await?;
+            let qs = embedder
+                .embed_queries(&lines)
+                .await?
+                .into_iter()
+                .map(|vector| RecallQuery {
+                    vector,
+                    exclude: None,
+                    relevant: Vec::new(),
+                })
+                .collect();
+            (qs, format!("file:{}", path.display()))
+        }
+        (None, None) => (
+            recall::self_queries(ids, vectors, sample),
+            format!("self-queries:{}", sample.min(vectors.len())),
+        ),
+    })
+}
+
+async fn rescore_cmd(config: &Option<PathBuf>, args: RescoreArgs) -> Result<()> {
+    let ctx = Ctx::load(config.as_deref())?;
+    let store = ctx.open_store()?;
+    let collection = store.require_collection(&args.collection)?;
+    if collection.codec != "f32" {
+        bail!(
+            "`bench rescore` needs an f32 collection as ground truth; `{}` is stored as {}",
+            collection.name,
+            collection.codec
+        );
+    }
+    if collection.chunk_count == 0 {
+        bail!("collection `{}` is empty", collection.name);
+    }
+    let baseline = F32Codec::new(collection.dimension);
+    let mut ids: Vec<i64> = Vec::new();
+    let mut sources: Vec<String> = Vec::new();
+    let mut vectors: Vec<Vec<f32>> = Vec::new();
+    for (id, source, enc) in store.vectors_with_sources(&collection.name)? {
+        ids.push(id);
+        sources.push(source);
+        vectors.push(baseline.decode(&enc)?);
+    }
+    let (queries, query_source) = load_queries(
+        &ctx,
+        &collection.embed_profile,
+        args.queries.as_ref(),
+        args.questions.as_ref(),
+        args.sample,
+        &ids,
+        &vectors,
+    )
+    .await?;
+
+    let fitted = |name: &str| -> Result<Box<dyn Codec>> {
+        let mut codec = codec_by_name(name, collection.dimension)?;
+        if codec.needs_fit() {
+            codec.fit(&vectors)?;
+        }
+        Ok(codec)
+    };
+    let seconds: Vec<Box<dyn Codec>> = args.rescore.iter().map(|n| fitted(n)).collect::<Result<_>>()?;
+    let second_refs: Vec<&dyn Codec> = seconds.iter().map(AsRef::as_ref).collect();
+
+    // Calibration for the adaptive policy: self-queries only, so the test
+    // queries' exact scores never inform their own depth.
+    let calibration = recall::self_queries(&ids, &vectors, args.calibration_sample);
+
+    let mut profiles = Vec::new();
+    let mut cells = Vec::new();
+    for name in &args.codecs {
+        let first = fitted(name)?;
+        let noise = recall::evaluate(
+            &ids,
+            &vectors,
+            &calibration,
+            first.as_ref(),
+            collection.metric,
+            args.k,
+            None,
+        )?
+        .rank_noise;
+        let plan = rescore::Plan {
+            seconds: &second_refs,
+            depths: &args.depths,
+            margins: &args.margins,
+            noise,
+            max_depth: args.max_depth,
+        };
+        let (profile, reports) = rescore::evaluate(
+            &ids,
+            &vectors,
+            &queries,
+            first.as_ref(),
+            collection.metric,
+            args.k,
+            &plan,
+            Some(&sources),
+        )?;
+        if !args.no_record {
+            for r in &reports {
+                let mut row = RunRow::new("rescore");
+                row.collection = Some(collection.name.clone());
+                row.embed_profile = Some(collection.embed_profile.clone());
+                row.embed_model = Some(collection.embed_model.clone());
+                row.codec = Some(match r.policy {
+                    rescore::Policy::None => r.first.clone(),
+                    rescore::Policy::Fixed { depth } => format!("{}>{}@{depth}", r.first, r.second),
+                    rescore::Policy::Margin { sigmas } => format!("{}>{}@{sigmas}σ", r.first, r.second),
+                });
+                row.metric = Some(collection.metric.name().to_owned());
+                row.metadata = serde_json::json!({
+                    "dimension": collection.dimension,
+                    "queries": query_source,
+                    "k": args.k,
+                    "first_stage": serde_json::to_value(&profile)?,
+                    "calibrated_noise": noise,
+                });
+                row.metrics = serde_json::to_value(r)?;
+                store.insert_run(&row)?;
+            }
+        }
+        profiles.push(profile);
+        cells.extend(reports);
+    }
+
+    if args.json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({ "profiles": profiles, "cells": cells }))?
+        );
+        return Ok(());
+    }
+    let f32_scan = vectors.len() * baseline.encoded_size();
+    println!(
+        "collection `{}` · {} vectors · {} dims · {} · {} · k={}",
+        collection.name,
+        vectors.len(),
+        collection.dimension,
+        collection.embed_model,
+        collection.metric.name(),
+        args.k
+    );
+    println!("queries: {query_source}");
+    for p in &profiles {
+        println!();
+        let depths: Vec<String> = p
+            .depth_for_recall
+            .iter()
+            .map(|(t, d)| format!("{:.0}%: {d}", t * 100.0))
+            .collect();
+        println!(
+            "first stage {} ({} B): recall@k {:.4}, noise/band {:.3}; depth an exact re-score needs for recall {}; median query complete at {}",
+            p.first,
+            p.first_bytes,
+            p.recall_at_k,
+            if p.neighbour_band > 0.0 {
+                p.rank_noise / p.neighbour_band
+            } else {
+                f64::NAN
+            },
+            depths.join(", "),
+            p.median_full_depth
+        );
+        println!(
+            "  {:<8} {:<8} {:>7} {:>6} {:>9} {:>7} {:>7} {:>8} {:>8} {:>10} {:>8}",
+            "rescore", "policy", "depth", "p90", "recall@k", "p10", "top1", "ndcg@k", "doc rec", "KB/query", "vs f32"
+        );
+        for r in cells.iter().filter(|r| r.first == p.first) {
+            let policy = match r.policy {
+                rescore::Policy::None => "-".to_owned(),
+                rescore::Policy::Fixed { .. } => "fixed".to_owned(),
+                rescore::Policy::Margin { sigmas } => format!("{sigmas}σ"),
+            };
+            println!(
+                "  {:<8} {:<8} {:>7.1} {:>6} {:>9.4} {:>7.3} {:>7.3} {:>8} {:>8} {:>10.1} {:>7.3}x",
+                r.second,
+                policy,
+                r.mean_depth,
+                r.p90_depth,
+                r.recall_at_k,
+                r.p10_recall_at_k,
+                r.top1_agreement,
+                r.ndcg_at_k.map_or("-".into(), |v| format!("{v:.4}")),
+                r.doc_recall_at_k.map_or("-".into(), |v| format!("{v:.4}")),
+                r.bytes_read_per_query / 1024.0,
+                r.bytes_read_per_query / f32_scan as f64,
+            );
+        }
+    }
+    println!(
+        "\ndepth is mean candidates re-scored per query, p90 its 90th percentile, p10 the 10th-percentile query's recall; Nσ re-scores every candidate within N calibrated noise units of the k-th first-stage score; KB/query is the first-stage scan plus the re-scored candidates; vs f32 compares it with an exact f32 scan of every vector"
+    );
+    if !args.no_record {
+        eprintln!("\n{} runs recorded (kind: rescore)", cells.len());
     }
     Ok(())
 }
