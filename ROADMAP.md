@@ -190,6 +190,10 @@ decide how deep a hybrid re-score must go, and to decide where an adaptive code 
   today it is the best 48-byte code for recall and the slowest to scan, 2.2× f32 per vector.
 - [ ] Time the hybrid end to end, with the f32 candidates fetched from disk, not memory.
 - [ ] SIMD kernels for f32 and int8, so the asymmetric codecs are compared at their best.
+- [ ] Memory-waste audit, after vLLM: resident memory per vector against the codec's bytes per
+  vector, across load, search and ingest. Starting points: reserve `load_codes`'s buffer from the
+  chunk count, count the SQLite page cache alongside the cached buffer, and try fixed-size blocks
+  for collections that grow.
 - [ ] Decide whether to allow one reviewed `unsafe` call for memory-mapped code files
   (`unsafe_code` is forbidden workspace-wide today). A flat file already loads 110 MB in 9 ms, so
   the case is memory footprint and start-up on much larger collections.
@@ -247,10 +251,18 @@ serving work around it maps onto hvec's codecs, hybrid retrieval and storage:
   retrieval with pages as candidates; the depth-from-noise-and-band result may predict the page
   budget a query needs.
 - **PagedAttention and vLLM** (arXiv:2309.06180, [code](https://github.com/vllm-project/vllm)).
-  The KV cache lives in fixed-size blocks rather than one contiguous allocation, so it grows
-  without copying and blocks can be shared between requests. *In hvec:* `CodeBuffer` is one
-  contiguous allocation per collection, invalidated and rebuilt on every write. Fixed-size blocks
-  would let agent memory (`bench memory`) append without rebuilding.
+  The problem vLLM solves is GPU memory waste. Each request's KV cache is large and grows and
+  shrinks as it decodes, and earlier serving systems lost much of that memory to fragmentation and
+  duplicated copies. Wasted memory caps the batch size, and the batch size sets the throughput.
+  PagedAttention stores the cache in fixed-size blocks, like an operating system's virtual-memory
+  pages, so waste is near zero and requests can share blocks; the paper reports 2–4× throughput
+  at the same latency. *In hvec:* compression (fewer bytes per vector) and eliminating waste
+  (no bytes allocated but unused) are two separate ways to fit more into the same memory, and
+  hvec has measured only the first. Its own waste is unmeasured. `Store::load_codes` grows its
+  buffer without reserving capacity, so the cached buffer can hold up to twice the memory its
+  codes need. The buffer and SQLite's page cache can also hold the same codes at once. And
+  `CodeBuffer` is rebuilt on every write, where fixed-size blocks would let agent memory
+  (`bench memory`) append without copying.
 - **vLLM as a chat server.** vLLM serves an OpenAI-compatible API, which hvec's `openai` provider
   already speaks (as it does for Ollama), so it could run Experiments 1 and 3 locally without
   spending API credit. Its prefix caching rewards prompts that start the same way: retrieved
