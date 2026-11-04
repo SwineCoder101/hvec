@@ -18,8 +18,18 @@ pub fn norm(a: &[f32]) -> f32 {
 /// Cosine similarity. Returns 0 when either vector has zero norm.
 #[must_use]
 pub fn cosine(a: &[f32], b: &[f32]) -> f32 {
-    let denom = norm(a) * norm(b);
-    if denom == 0.0 { 0.0 } else { dot(a, b) / denom }
+    debug_assert_eq!(a.len(), b.len());
+    // One pass over both vectors. Each of the three sums accumulates in the
+    // same order as `dot` and `norm` would, so the result is identical to
+    // `dot(a, b) / (norm(a) * norm(b))`, at a third of the memory traffic.
+    let (mut ab, mut aa, mut bb) = (0f32, 0f32, 0f32);
+    for (&x, &y) in a.iter().zip(b) {
+        ab += x * y;
+        aa += x * x;
+        bb += y * y;
+    }
+    let denom = aa.sqrt() * bb.sqrt();
+    if denom == 0.0 { 0.0 } else { ab / denom }
 }
 
 /// Squared Euclidean distance.

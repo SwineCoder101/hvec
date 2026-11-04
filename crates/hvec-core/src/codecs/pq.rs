@@ -249,11 +249,11 @@ impl Codec for PqCodec {
         Ok(Encoded(codes))
     }
 
-    fn decode(&self, encoded: &Encoded) -> Result<Vector, CodecError> {
-        check_payload(self.encoded_size(), encoded.0.len())?;
+    fn decode(&self, encoded: &[u8]) -> Result<Vector, CodecError> {
+        check_payload(self.encoded_size(), encoded.len())?;
         let books = self.books()?;
         let mut out = Vec::with_capacity(self.dimension);
-        for (j, &code) in encoded.0.iter().enumerate() {
+        for (j, &code) in encoded.iter().enumerate() {
             let c = usize::from(code);
             if c >= books.k {
                 return Err(CodecError::BadParams {
@@ -266,12 +266,12 @@ impl Codec for PqCodec {
         Ok(out)
     }
 
-    fn score(&self, query: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
+    fn score(&self, query: &[f32], encoded: &[u8], metric: Metric) -> Result<f32, CodecError> {
         check_dim(self.dimension, query.len())?;
-        check_payload(self.encoded_size(), encoded.0.len())?;
+        check_payload(self.encoded_size(), encoded.len())?;
         let books = self.books()?;
         let (mut dot, mut stored_norm_sq, mut sum_qq) = (0f64, 0f64, 0f64);
-        for (j, &code) in encoded.0.iter().enumerate() {
+        for (j, &code) in encoded.iter().enumerate() {
             let c = usize::from(code);
             if c >= books.k {
                 return Err(CodecError::BadParams {

@@ -82,8 +82,26 @@ pub enum CodecError {
 }
 
 /// A compressed representation of a vector, as stored on disk.
+///
+/// This is the owned form [`Codec::encode`] returns. Scoring and decoding
+/// borrow the bytes instead (`&[u8]`), so a codec can score codes in place:
+/// in a contiguous buffer, a memory-mapped file or a database page. `Encoded`
+/// dereferences to `[u8]`, so `&encoded` works wherever `&[u8]` is expected.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Encoded(pub Vec<u8>);
+
+impl std::ops::Deref for Encoded {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for Encoded {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 /// A compression scheme whose compressed form supports distance computation.
 ///
@@ -108,13 +126,13 @@ pub trait Codec: Send + Sync + std::fmt::Debug {
     fn encode(&self, vector: &[f32]) -> Result<Encoded, CodecError>;
 
     /// Reconstruct an approximation of the original vector.
-    fn decode(&self, encoded: &Encoded) -> Result<Vector, CodecError>;
+    fn decode(&self, encoded: &[u8]) -> Result<Vector, CodecError>;
 
     /// Score an uncompressed query against a compressed stored vector.
     ///
     /// This is the asymmetric form. It must not decode `encoded` into a full
     /// `Vector` unless the codec documents that it is a baseline.
-    fn score(&self, query: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError>;
+    fn score(&self, query: &[f32], encoded: &[u8], metric: Metric) -> Result<f32, CodecError>;
 
     /// Transform a query once per search, before it is scored against many
     /// stored vectors with [`Codec::score_prepared`].
@@ -131,7 +149,7 @@ pub trait Codec: Send + Sync + std::fmt::Debug {
     /// `score(query, …)` for the original query. The default forwards to
     /// [`Codec::score`], which is right whenever `prepare_query` is the
     /// identity.
-    fn score_prepared(&self, prepared: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
+    fn score_prepared(&self, prepared: &[f32], encoded: &[u8], metric: Metric) -> Result<f32, CodecError> {
         self.score(prepared, encoded, metric)
     }
 
@@ -184,7 +202,8 @@ pub trait Codec: Send + Sync + std::fmt::Debug {
 
 /// Instantiate a codec by its stable name, unfitted.
 ///
-/// Names: `f32`, `int8`, `binary`, `binary-centred`, `pq<m>` (product
+/// Names: `f32`, `int8`, `binary`, `binary-centred`, `binary-hamming` (the
+/// same bits as `binary`, scored symmetrically by popcount), `pq<m>` (product
 /// quantization with `m` subspaces; bare `pq` means one byte per 8
 /// dimensions), `mrl<k>` (keep the first `k` dimensions, Matryoshka style)
 /// `mrl<k>+<codec>` (truncate, then encode with another codec, for
@@ -200,6 +219,7 @@ pub fn codec_by_name(name: &str, dimension: usize) -> Result<Box<dyn Codec>, Cod
         "int8" => Ok(Box::new(codecs::Int8Codec::new(dimension))),
         "binary" => Ok(Box::new(codecs::BinaryCodec::new(dimension))),
         "binary-centred" => Ok(Box::new(codecs::BinaryCentredCodec::new(dimension))),
+        "binary-hamming" => Ok(Box::new(codecs::HammingCodec::new(dimension))),
         _ => {
             if let Some(rest) = name.strip_prefix("pq") {
                 let m = parse_param(name, rest, Some(dimension / 8))?;
@@ -276,6 +296,7 @@ pub fn codec_names() -> &'static [&'static str] {
         "int8",
         "binary",
         "binary-centred",
+        "binary-hamming",
         "pq<m>",
         "mrl<k>",
         "mrl<k>+<codec>",
