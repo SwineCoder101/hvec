@@ -1,0 +1,215 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 486" width="820" height="486" role="img" aria-labelledby="t d">
+<title id="t">Adaptive bits: mixed-precision allocation at 48 bytes</title>
+<desc id="d">Animated bar chart of how a 48-byte budget is spread over 384 principal components of SciFact's bge-small embeddings. Uniform binary gives every component 1 bit (recall@10 0.611). Variance-based allocation concentrates bits on the leading components and gives 97 components none (0.694); query-weighted allocation goes further, 158 components with none (0.703).</desc>
+<style>
+  svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781; --grid:#e1e0d9;
+         --axis:#c3c2b7; --s1:#2a78d6; --s2:#eb6834; --other:#898781;
+         --band:rgba(42,120,214,0.10); --band2:rgba(42,120,214,0.20); }
+  @media (prefers-color-scheme: dark) {
+    svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --grid:#2c2c2a; --axis:#383835;
+           --s1:#3987e5; --s2:#d95926; --band:rgba(57,135,229,0.16); --band2:rgba(57,135,229,0.28); }
+  }
+  text { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: var(--ink); }
+  .bg { fill: var(--surface); stroke: var(--grid); }
+  .h { font-size: 15px; font-weight: 600; }
+  .cap { font-size: 13px; fill: var(--ink2); }
+  .small { font-size: 11px; fill: var(--muted); }
+  .lbl { font-size: 12px; fill: var(--ink2); }
+  .num { font-size: 12px; fill: var(--ink); font-variant-numeric: tabular-nums; }
+  .axis { stroke: var(--axis); stroke-width: 1; }
+  .grid { stroke: var(--grid); stroke-width: 1; }
+  .true { fill: var(--s1); stroke: var(--surface); stroke-width: 2; }
+  .other { fill: var(--other); fill-opacity: .55; stroke: var(--surface); stroke-width: 2; }
+  .lost { fill: var(--s2); stroke: var(--surface); stroke-width: 2; }
+  .cut { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 3; }
+  .fixed { stroke: var(--s2); stroke-width: 2; stroke-dasharray: 5 3; }
+  .band { fill: var(--band); }
+  .band2 { fill: var(--band2); }
+@keyframes b0 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.6250) } 61% { transform:scaleY(0.6250) } 66% { transform:scaleY(0.9250) } 94% { transform:scaleY(0.9250) } 100% { transform:scaleY(0.2000) } }
+.b0 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.9250); animation: b0 15s infinite; }
+@keyframes b1 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.5000) } 61% { transform:scaleY(0.5000) } 66% { transform:scaleY(0.6750) } 94% { transform:scaleY(0.6750) } 100% { transform:scaleY(0.2000) } }
+.b1 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.6750); animation: b1 15s infinite; }
+@keyframes b2 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.4000) } 61% { transform:scaleY(0.4000) } 66% { transform:scaleY(0.6000) } 94% { transform:scaleY(0.6000) } 100% { transform:scaleY(0.2000) } }
+.b2 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.6000); animation: b2 15s infinite; }
+@keyframes b3 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.4000) } 61% { transform:scaleY(0.4000) } 66% { transform:scaleY(0.5500) } 94% { transform:scaleY(0.5500) } 100% { transform:scaleY(0.2000) } }
+.b3 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.5500); animation: b3 15s infinite; }
+@keyframes b4 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.4000) } 61% { transform:scaleY(0.4000) } 66% { transform:scaleY(0.4000) } 94% { transform:scaleY(0.4000) } 100% { transform:scaleY(0.2000) } }
+.b4 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.4000); animation: b4 15s infinite; }
+@keyframes b5 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.4000) } 61% { transform:scaleY(0.4000) } 66% { transform:scaleY(0.4500) } 94% { transform:scaleY(0.4500) } 100% { transform:scaleY(0.2000) } }
+.b5 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.4500); animation: b5 15s infinite; }
+@keyframes b6 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.4000) } 61% { transform:scaleY(0.4000) } 66% { transform:scaleY(0.4000) } 94% { transform:scaleY(0.4000) } 100% { transform:scaleY(0.2000) } }
+.b6 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.4000); animation: b6 15s infinite; }
+@keyframes b7 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.4000) } 61% { transform:scaleY(0.4000) } 66% { transform:scaleY(0.4250) } 94% { transform:scaleY(0.4250) } 100% { transform:scaleY(0.2000) } }
+.b7 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.4250); animation: b7 15s infinite; }
+@keyframes b8 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.4000) } 61% { transform:scaleY(0.4000) } 66% { transform:scaleY(0.3500) } 94% { transform:scaleY(0.3500) } 100% { transform:scaleY(0.2000) } }
+.b8 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.3500); animation: b8 15s infinite; }
+@keyframes b9 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.4000) } 61% { transform:scaleY(0.4000) } 66% { transform:scaleY(0.3500) } 94% { transform:scaleY(0.3500) } 100% { transform:scaleY(0.2000) } }
+.b9 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.3500); animation: b9 15s infinite; }
+@keyframes b10 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.3000) } 61% { transform:scaleY(0.3000) } 66% { transform:scaleY(0.3000) } 94% { transform:scaleY(0.3000) } 100% { transform:scaleY(0.2000) } }
+.b10 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.3000); animation: b10 15s infinite; }
+@keyframes b11 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.2500) } 94% { transform:scaleY(0.2500) } 100% { transform:scaleY(0.2000) } }
+.b11 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.2500); animation: b11 15s infinite; }
+@keyframes b12 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.3000) } 94% { transform:scaleY(0.3000) } 100% { transform:scaleY(0.2000) } }
+.b12 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.3000); animation: b12 15s infinite; }
+@keyframes b13 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.2500) } 94% { transform:scaleY(0.2500) } 100% { transform:scaleY(0.2000) } }
+.b13 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.2500); animation: b13 15s infinite; }
+@keyframes b14 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.2250) } 94% { transform:scaleY(0.2250) } 100% { transform:scaleY(0.2000) } }
+.b14 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.2250); animation: b14 15s infinite; }
+@keyframes b15 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.2500) } 94% { transform:scaleY(0.2500) } 100% { transform:scaleY(0.2000) } }
+.b15 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.2500); animation: b15 15s infinite; }
+@keyframes b16 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.2250) } 94% { transform:scaleY(0.2250) } 100% { transform:scaleY(0.2000) } }
+.b16 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.2250); animation: b16 15s infinite; }
+@keyframes b17 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.1750) } 94% { transform:scaleY(0.1750) } 100% { transform:scaleY(0.2000) } }
+.b17 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.1750); animation: b17 15s infinite; }
+@keyframes b18 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.1750) } 94% { transform:scaleY(0.1750) } 100% { transform:scaleY(0.2000) } }
+.b18 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.1750); animation: b18 15s infinite; }
+@keyframes b19 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.2000) } 94% { transform:scaleY(0.2000) } 100% { transform:scaleY(0.2000) } }
+.b19 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.2000); animation: b19 15s infinite; }
+@keyframes b20 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.1250) } 94% { transform:scaleY(0.1250) } 100% { transform:scaleY(0.2000) } }
+.b20 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.1250); animation: b20 15s infinite; }
+@keyframes b21 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.1500) } 94% { transform:scaleY(0.1500) } 100% { transform:scaleY(0.2000) } }
+.b21 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.1500); animation: b21 15s infinite; }
+@keyframes b22 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.1750) } 94% { transform:scaleY(0.1750) } 100% { transform:scaleY(0.2000) } }
+.b22 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.1750); animation: b22 15s infinite; }
+@keyframes b23 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.2000) } 94% { transform:scaleY(0.2000) } 100% { transform:scaleY(0.2000) } }
+.b23 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.2000); animation: b23 15s infinite; }
+@keyframes b24 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.0500) } 94% { transform:scaleY(0.0500) } 100% { transform:scaleY(0.2000) } }
+.b24 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0500); animation: b24 15s infinite; }
+@keyframes b25 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.0750) } 94% { transform:scaleY(0.0750) } 100% { transform:scaleY(0.2000) } }
+.b25 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0750); animation: b25 15s infinite; }
+@keyframes b26 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.1250) } 94% { transform:scaleY(0.1250) } 100% { transform:scaleY(0.2000) } }
+.b26 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.1250); animation: b26 15s infinite; }
+@keyframes b27 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.1000) } 94% { transform:scaleY(0.1000) } 100% { transform:scaleY(0.2000) } }
+.b27 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.1000); animation: b27 15s infinite; }
+@keyframes b28 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.0750) } 94% { transform:scaleY(0.0750) } 100% { transform:scaleY(0.2000) } }
+.b28 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0750); animation: b28 15s infinite; }
+@keyframes b29 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.0750) } 94% { transform:scaleY(0.0750) } 100% { transform:scaleY(0.2000) } }
+.b29 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0750); animation: b29 15s infinite; }
+@keyframes b30 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.0250) } 94% { transform:scaleY(0.0250) } 100% { transform:scaleY(0.2000) } }
+.b30 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0250); animation: b30 15s infinite; }
+@keyframes b31 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.0000) } 94% { transform:scaleY(0.0000) } 100% { transform:scaleY(0.2000) } }
+.b31 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0000); animation: b31 15s infinite; }
+@keyframes b32 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.0500) } 94% { transform:scaleY(0.0500) } 100% { transform:scaleY(0.2000) } }
+.b32 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0500); animation: b32 15s infinite; }
+@keyframes b33 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.0250) } 94% { transform:scaleY(0.0250) } 100% { transform:scaleY(0.2000) } }
+.b33 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0250); animation: b33 15s infinite; }
+@keyframes b34 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.2000) } 61% { transform:scaleY(0.2000) } 66% { transform:scaleY(0.0750) } 94% { transform:scaleY(0.0750) } 100% { transform:scaleY(0.2000) } }
+.b34 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0750); animation: b34 15s infinite; }
+@keyframes b35 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.1750) } 61% { transform:scaleY(0.1750) } 66% { transform:scaleY(0.1000) } 94% { transform:scaleY(0.1000) } 100% { transform:scaleY(0.2000) } }
+.b35 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.1000); animation: b35 15s infinite; }
+@keyframes b36 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.0000) } 61% { transform:scaleY(0.0000) } 66% { transform:scaleY(0.0500) } 94% { transform:scaleY(0.0500) } 100% { transform:scaleY(0.2000) } }
+.b36 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0500); animation: b36 15s infinite; }
+@keyframes b37 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.0000) } 61% { transform:scaleY(0.0000) } 66% { transform:scaleY(0.0500) } 94% { transform:scaleY(0.0500) } 100% { transform:scaleY(0.2000) } }
+.b37 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0500); animation: b37 15s infinite; }
+@keyframes b38 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.0000) } 61% { transform:scaleY(0.0000) } 66% { transform:scaleY(0.0250) } 94% { transform:scaleY(0.0250) } 100% { transform:scaleY(0.2000) } }
+.b38 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0250); animation: b38 15s infinite; }
+@keyframes b39 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.0000) } 61% { transform:scaleY(0.0000) } 66% { transform:scaleY(0.0250) } 94% { transform:scaleY(0.0250) } 100% { transform:scaleY(0.2000) } }
+.b39 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0250); animation: b39 15s infinite; }
+@keyframes b40 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.0000) } 61% { transform:scaleY(0.0000) } 66% { transform:scaleY(0.0750) } 94% { transform:scaleY(0.0750) } 100% { transform:scaleY(0.2000) } }
+.b40 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0750); animation: b40 15s infinite; }
+@keyframes b41 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.0000) } 61% { transform:scaleY(0.0000) } 66% { transform:scaleY(0.0500) } 94% { transform:scaleY(0.0500) } 100% { transform:scaleY(0.2000) } }
+.b41 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0500); animation: b41 15s infinite; }
+@keyframes b42 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.0000) } 61% { transform:scaleY(0.0000) } 66% { transform:scaleY(0.0250) } 94% { transform:scaleY(0.0250) } 100% { transform:scaleY(0.2000) } }
+.b42 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0250); animation: b42 15s infinite; }
+@keyframes b43 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.0000) } 61% { transform:scaleY(0.0000) } 66% { transform:scaleY(0.0250) } 94% { transform:scaleY(0.0250) } 100% { transform:scaleY(0.2000) } }
+.b43 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0250); animation: b43 15s infinite; }
+@keyframes b44 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.0000) } 61% { transform:scaleY(0.0000) } 66% { transform:scaleY(0.1250) } 94% { transform:scaleY(0.1250) } 100% { transform:scaleY(0.2000) } }
+.b44 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.1250); animation: b44 15s infinite; }
+@keyframes b45 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.0000) } 61% { transform:scaleY(0.0000) } 66% { transform:scaleY(0.1000) } 94% { transform:scaleY(0.1000) } 100% { transform:scaleY(0.2000) } }
+.b45 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.1000); animation: b45 15s infinite; }
+@keyframes b46 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.0000) } 61% { transform:scaleY(0.0000) } 66% { transform:scaleY(0.0500) } 94% { transform:scaleY(0.0500) } 100% { transform:scaleY(0.2000) } }
+.b46 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.0500); animation: b46 15s infinite; }
+@keyframes b47 { 0% { transform:scaleY(0.2000) } 28% { transform:scaleY(0.2000) } 33% { transform:scaleY(0.0000) } 61% { transform:scaleY(0.0000) } 66% { transform:scaleY(0.1000) } 94% { transform:scaleY(0.1000) } 100% { transform:scaleY(0.2000) } }
+.b47 { transform-box: fill-box; transform-origin: bottom; transform: scaleY(0.1000); animation: b47 15s infinite; }
+@keyframes bc0 { 0% { opacity:1 } 28% { opacity:1 } 30% { opacity:0 } 100% { opacity:0 } }
+.bc0 { opacity:0; animation: bc0 15s infinite; }
+@keyframes bc1 { 0% { opacity:0 } 30.99% { opacity:0 } 33% { opacity:1 } 61% { opacity:1 } 63% { opacity:0 } 100% { opacity:0 } }
+.bc1 { opacity:0; animation: bc1 15s infinite; }
+@keyframes bc2 { 0% { opacity:0 } 63.99% { opacity:0 } 66% { opacity:1 } 98% { opacity:1 } 100% { opacity:0 } 100% { opacity:0 } }
+.bc2 { opacity:1; animation: bc2 15s infinite; }
+@keyframes bs0 { 0% { opacity:1 } 28% { opacity:1 } 30% { opacity:0 } 100% { opacity:0 } }
+.bs0 { opacity:0; animation: bs0 15s infinite; }
+@keyframes bs1 { 0% { opacity:0 } 30.99% { opacity:0 } 33% { opacity:1 } 61% { opacity:1 } 63% { opacity:0 } 100% { opacity:0 } }
+.bs1 { opacity:0; animation: bs1 15s infinite; }
+@keyframes bs2 { 0% { opacity:0 } 63.99% { opacity:0 } 66% { opacity:1 } 98% { opacity:1 } 100% { opacity:0 } 100% { opacity:0 } }
+.bs2 { opacity:1; animation: bs2 15s infinite; }
+@keyframes tail { 0% { opacity:0 } 66% { opacity:0 } 70% { opacity:1 } 94% { opacity:1 } 100% { opacity:0 } }
+.tail { opacity:1; animation: tail 15s infinite; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+<rect class="bg" x="0.5" y="0.5" width="819" height="485" rx="8"/>
+<text class="h" x="24" y="32">Adaptive bits: the same 48 bytes, spent where they matter</text>
+<line class="grid" x1="64" y1="138.0" x2="790" y2="138.0"/><text class="small" x="58" y="142.0" text-anchor="end">0.001</text>
+<line class="grid" x1="64" y1="115.3" x2="790" y2="115.3"/><text class="small" x="58" y="119.3" text-anchor="end">0.01</text>
+<line class="grid" x1="64" y1="92.7" x2="790" y2="92.7"/><text class="small" x="58" y="96.7" text-anchor="end">0.1</text>
+<line class="grid" x1="64" y1="70.0" x2="790" y2="70.0"/><text class="small" x="58" y="74.0" text-anchor="end">1</text>
+<polyline points="64.9,70.0 66.8,79.2 68.7,80.3 70.6,81.3 72.5,82.6 74.4,83.4 76.3,85.3 78.2,85.8 80.1,87.3 82.0,87.5 83.9,88.2 85.7,88.8 87.6,89.7 89.5,89.8 91.4,90.3 93.3,90.8 95.2,91.1 97.1,91.2 99.0,91.8 100.9,92.6 102.8,93.1 104.6,93.3 106.5,93.7 108.4,93.9 110.3,94.1 112.2,94.2 114.1,94.6 116.0,94.9 117.9,95.0 119.8,95.3 121.7,95.5 123.6,95.8 125.4,96.0 127.3,96.3 129.2,96.6 131.1,96.7 133.0,96.9 134.9,97.0 136.8,97.3 138.7,97.4 140.6,97.6 142.5,97.8 144.4,98.0 146.2,98.2 148.1,98.3 150.0,98.4 151.9,98.6 153.8,98.6 155.7,98.9 157.6,99.1 159.5,99.4 161.4,99.5 163.3,99.6 165.1,99.7 167.0,99.9 168.9,100.0 170.8,100.1 172.7,100.3 174.6,100.4 176.5,100.6 178.4,100.6 180.3,100.8 182.2,100.9 184.1,100.9 185.9,101.1 187.8,101.2 189.7,101.3 191.6,101.5 193.5,101.6 195.4,101.7 197.3,101.9 199.2,102.0 201.1,102.1 203.0,102.2 204.9,102.3 206.7,102.4 208.6,102.4 210.5,102.5 212.4,102.7 214.3,102.8 216.2,102.8 218.1,102.9 220.0,103.0 221.9,103.1 223.8,103.2 225.6,103.3 227.5,103.4 229.4,103.5 231.3,103.6 233.2,103.7 235.1,103.8 237.0,103.8 238.9,104.0 240.8,104.1 242.7,104.2 244.6,104.3 246.4,104.3 248.3,104.3 250.2,104.5 252.1,104.6 254.0,104.7 255.9,104.7 257.8,104.9 259.7,104.9 261.6,105.0 263.5,105.1 265.4,105.1 267.2,105.3 269.1,105.5 271.0,105.6 272.9,105.7 274.8,105.7 276.7,105.8 278.6,105.8 280.5,105.9 282.4,105.9 284.3,106.0 286.1,106.1 288.0,106.1 289.9,106.2 291.8,106.3 293.7,106.4 295.6,106.4 297.5,106.5 299.4,106.7 301.3,106.7 303.2,106.9 305.1,107.0 306.9,107.0 308.8,107.1 310.7,107.1 312.6,107.2 314.5,107.3 316.4,107.3 318.3,107.4 320.2,107.5 322.1,107.5 324.0,107.5 325.9,107.6 327.7,107.6 329.6,107.7 331.5,107.8 333.4,108.0 335.3,108.0 337.2,108.0 339.1,108.1 341.0,108.2 342.9,108.3 344.8,108.3 346.6,108.4 348.5,108.4 350.4,108.5 352.3,108.6 354.2,108.7 356.1,108.7 358.0,108.7 359.9,108.9 361.8,108.9 363.7,109.0 365.6,109.0 367.4,109.1 369.3,109.1 371.2,109.2 373.1,109.2 375.0,109.3 376.9,109.4 378.8,109.4 380.7,109.5 382.6,109.5 384.5,109.7 386.4,109.7 388.2,109.7 390.1,109.8 392.0,109.9 393.9,110.0 395.8,110.0 397.7,110.1 399.6,110.1 401.5,110.2 403.4,110.3 405.3,110.4 407.1,110.4 409.0,110.5 410.9,110.6 412.8,110.6 414.7,110.7 416.6,110.7 418.5,110.8 420.4,110.8 422.3,110.9 424.2,111.0 426.1,111.1 427.9,111.2 429.8,111.2 431.7,111.3 433.6,111.3 435.5,111.4 437.4,111.5 439.3,111.5 441.2,111.6 443.1,111.8 445.0,111.8 446.9,111.8 448.7,111.9 450.6,111.9 452.5,112.0 454.4,112.0 456.3,112.1 458.2,112.2 460.1,112.2 462.0,112.3 463.9,112.4 465.8,112.4 467.6,112.4 469.5,112.5 471.4,112.6 473.3,112.6 475.2,112.7 477.1,112.7 479.0,112.8 480.9,112.9 482.8,112.9 484.7,113.0 486.6,113.1 488.4,113.2 490.3,113.2 492.2,113.2 494.1,113.3 496.0,113.4 497.9,113.4 499.8,113.4 501.7,113.5 503.6,113.6 505.5,113.6 507.4,113.7 509.2,113.8 511.1,113.8 513.0,113.9 514.9,114.0 516.8,114.0 518.7,114.1 520.6,114.1 522.5,114.1 524.4,114.2 526.3,114.2 528.1,114.3 530.0,114.3 531.9,114.4 533.8,114.5 535.7,114.5 537.6,114.6 539.5,114.7 541.4,114.8 543.3,114.8 545.2,114.8 547.1,114.9 548.9,114.9 550.8,115.0 552.7,115.1 554.6,115.1 556.5,115.1 558.4,115.2 560.3,115.3 562.2,115.4 564.1,115.4 566.0,115.5 567.9,115.6 569.7,115.6 571.6,115.7 573.5,115.7 575.4,115.7 577.3,115.8 579.2,115.9 581.1,116.0 583.0,116.0 584.9,116.1 586.8,116.2 588.6,116.2 590.5,116.3 592.4,116.3 594.3,116.3 596.2,116.4 598.1,116.5 600.0,116.6 601.9,116.6 603.8,116.7 605.7,116.8 607.6,116.8 609.4,116.9 611.3,116.9 613.2,117.0 615.1,117.0 617.0,117.1 618.9,117.2 620.8,117.3 622.7,117.3 624.6,117.4 626.5,117.5 628.4,117.5 630.2,117.6 632.1,117.6 634.0,117.7 635.9,117.8 637.8,117.9 639.7,117.9 641.6,118.0 643.5,118.0 645.4,118.1 647.3,118.2 649.1,118.2 651.0,118.3 652.9,118.4 654.8,118.4 656.7,118.6 658.6,118.6 660.5,118.6 662.4,118.8 664.3,118.8 666.2,118.8 668.1,118.9 669.9,119.0 671.8,119.1 673.7,119.2 675.6,119.2 677.5,119.3 679.4,119.3 681.3,119.5 683.2,119.6 685.1,119.7 687.0,119.8 688.9,119.8 690.7,119.9 692.6,120.0 694.5,120.1 696.4,120.1 698.3,120.3 700.2,120.4 702.1,120.4 704.0,120.5 705.9,120.6 707.8,120.7 709.6,120.7 711.5,120.8 713.4,120.9 715.3,121.0 717.2,121.1 719.1,121.2 721.0,121.2 722.9,121.3 724.8,121.5 726.7,121.5 728.6,121.6 730.4,121.6 732.3,121.7 734.2,121.8 736.1,122.0 738.0,122.2 739.9,122.3 741.8,122.4 743.7,122.5 745.6,122.7 747.5,122.8 749.4,122.9 751.2,123.2 753.1,123.4 755.0,123.5 756.9,123.7 758.8,123.8 760.7,124.0 762.6,124.3 764.5,124.5 766.4,124.5 768.3,124.8 770.1,125.1 772.0,125.6 773.9,127.0 775.8,127.3 777.7,128.3 779.6,130.5 781.5,132.8 783.4,138.0 785.3,138.0 787.2,138.0 789.1,138.0" fill="none" stroke="var(--s1)" stroke-width="2"/>
+<text class="lbl" x="64" y="60">variance per principal component, relative to the first (log scale, clipped at 0.001)</text>
+<line class="grid" x1="64" y1="370.0" x2="790" y2="370.0"/><text class="small" x="58" y="374.0" text-anchor="end">0</text>
+<line class="grid" x1="64" y1="332.0" x2="790" y2="332.0"/><text class="small" x="58" y="336.0" text-anchor="end">8</text>
+<line class="grid" x1="64" y1="294.0" x2="790" y2="294.0"/><text class="small" x="58" y="298.0" text-anchor="end">16</text>
+<line class="grid" x1="64" y1="256.0" x2="790" y2="256.0"/><text class="small" x="58" y="260.0" text-anchor="end">24</text>
+<line class="grid" x1="64" y1="218.0" x2="790" y2="218.0"/><text class="small" x="58" y="222.0" text-anchor="end">32</text>
+<line class="grid" x1="64" y1="180.0" x2="790" y2="180.0"/><text class="small" x="58" y="184.0" text-anchor="end">40</text>
+<text class="lbl" x="64" y="168">bits per group of 8 components (48 bytes = 384 bits in all)</text>
+<rect class="b0" x="65.0" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b1" x="80.1" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b2" x="95.2" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b3" x="110.4" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b4" x="125.5" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b5" x="140.6" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b6" x="155.8" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b7" x="170.9" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b8" x="186.0" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b9" x="201.1" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b10" x="216.2" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b11" x="231.4" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b12" x="246.5" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b13" x="261.6" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b14" x="276.8" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b15" x="291.9" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b16" x="307.0" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b17" x="322.1" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b18" x="337.2" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b19" x="352.4" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b20" x="367.5" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b21" x="382.6" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b22" x="397.8" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b23" x="412.9" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b24" x="428.0" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b25" x="443.1" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b26" x="458.2" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b27" x="473.4" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b28" x="488.5" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b29" x="503.6" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b30" x="518.8" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b31" x="533.9" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b32" x="549.0" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b33" x="564.1" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b34" x="579.2" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b35" x="594.4" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b36" x="609.5" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b37" x="624.6" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b38" x="639.8" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b39" x="654.9" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b40" x="670.0" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b41" x="685.1" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b42" x="700.2" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b43" x="715.4" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b44" x="730.5" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b45" x="745.6" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b46" x="760.8" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<rect class="b47" x="775.9" y="180" width="13.1" height="190" fill="var(--s1)"/>
+<line class="axis" x1="64" y1="370" x2="790" y2="370"/>
+<text class="small" x="64" y="386">component 1</text><text class="small" x="790" y="386" text-anchor="end">component 384</text>
+<text class="cap bc0" x="24" y="410">Uniform: 1 bit on every dimension (binary, 48 B)</text>
+<text class="cap bc1" x="24" y="410">mixed48-pca: rotate to principal components, spend bits where the variance is</text>
+<text class="cap bc2" x="24" y="410">mixed48-pca-w: weight variance by how much energy queries put there</text>
+<text class="num bs0" x="24" y="432">recall@10 without re-scoring: 0.611 · components with 0 bits: 0 of 384</text>
+<text class="num bs1" x="24" y="432">recall@10 without re-scoring: 0.694 · components with 0 bits: 97 of 384</text>
+<text class="num bs2" x="24" y="432">recall@10 without re-scoring: 0.703 · components with 0 bits: 158 of 384</text>
+<text class="small tail" x="790" y="313.0" text-anchor="end">bits return to the last 44 components: little variance,</text><text class="small tail" x="790" y="327.0" text-anchor="end">but 28% of the corpus mean, which every query points along</text>
+<text class="small" x="24" y="458">Real data: SciFact, bge-small-en-v1.5, 8,036 chunks, 300 claims. pq48 at the same 48 bytes reaches 0.711.</text><text class="small" x="24" y="472">Mixed precision by importance is the idea behind structure-aware MoE quantization (QuantMoE-Bench).</text>
+
+</svg>
