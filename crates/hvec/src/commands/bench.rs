@@ -24,6 +24,7 @@ pub async fn run(config: &Option<PathBuf>, cmd: BenchCommand) -> Result<()> {
         BenchCommand::Rescore(args) => rescore_cmd(config, args).await,
         BenchCommand::Run(args) => run_cmd(config, args).await,
         BenchCommand::Memory(args) => crate::commands::memory::run(config, args).await,
+        BenchCommand::Scan(args) => crate::commands::scan::run(config, &args),
     }
 }
 

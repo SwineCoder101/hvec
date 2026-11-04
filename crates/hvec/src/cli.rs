@@ -161,6 +161,39 @@ pub enum BenchCommand {
     Run(BenchRunArgs),
     /// Replay an agent memory script (writes and asks) once per codec, measuring every step.
     Memory(MemoryArgs),
+    /// Time the scan itself: storage paths, codecs and thread counts, against memory bandwidth.
+    Scan(ScanArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct ScanArgs {
+    /// An f32 collection; it is the ground truth and the source every codec is encoded from.
+    #[arg(short, long)]
+    pub collection: String,
+    /// Codecs to time on the in-memory buffer. Trained codecs are fitted on the collection first.
+    #[arg(long, value_delimiter = ',', default_value = "f32,int8,binary,binary-hamming,pq48")]
+    pub codecs: Vec<String>,
+    /// Thread counts for the buffered scan.
+    #[arg(long, value_delimiter = ',', default_value = "1")]
+    pub threads: Vec<usize>,
+    /// Neighbours per query.
+    #[arg(short, long, default_value_t = 10)]
+    pub k: usize,
+    /// Stored vectors used as queries; each is excluded from its own ranking when recall is counted.
+    #[arg(long, default_value_t = 50)]
+    pub sample: usize,
+    /// Timed passes over the queries; the median pass is reported.
+    #[arg(long, default_value_t = 3)]
+    pub repeat: usize,
+    /// Size of the buffer read to measure memory bandwidth, in MiB.
+    #[arg(long, default_value_t = 1024)]
+    pub bandwidth_mib: usize,
+    /// Skip the slow per-query SQLite paths.
+    #[arg(long)]
+    pub skip_sqlite: bool,
+    /// Print the results as JSON instead of tables.
+    #[arg(long)]
+    pub json: bool,
 }
 
 #[derive(Debug, Args)]

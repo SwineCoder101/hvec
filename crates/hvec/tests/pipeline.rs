@@ -1193,3 +1193,57 @@ fn memory_script_replays_per_codec_and_accounts_bytes() {
         18
     );
 }
+
+#[test]
+fn bench_scan_times_paths_and_codecs_and_keeps_f32_exact() {
+    let env = Env::new();
+    for i in 0..6 {
+        env.write_doc(
+            &format!("extra{i}.md"),
+            &format!("Topic {i}: notes about subject number {i} and its details, item {i}."),
+        );
+    }
+    env.write_doc("refunds.md", REFUNDS);
+    env.write_doc("shipping.md", SHIPPING);
+    let dir = env.dir.path().to_str().unwrap().to_owned();
+    assert_ok(&env.run(&["ingest", &dir, "--collection", "docs"]), "ingest dir");
+
+    let out = env.run(&[
+        "bench",
+        "scan",
+        "--collection",
+        "docs",
+        "--codecs",
+        "f32,binary,binary-hamming",
+        "--threads",
+        "1,2",
+        "-k",
+        "3",
+        "--sample",
+        "4",
+        "--repeat",
+        "1",
+        "--bandwidth-mib",
+        "8",
+        "--json",
+    ]);
+    assert_ok(&out, "bench scan");
+    let r: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("json report");
+    assert_eq!(r["vectors"], 8);
+    assert_eq!(r["queries"], 4);
+    let paths: Vec<&str> = r["paths"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["path"].as_str().unwrap())
+        .collect();
+    assert_eq!(paths.len(), 4, "{paths:?}");
+    assert_eq!(r["loads"].as_array().unwrap().len(), 2);
+    let codecs = r["codecs"].as_array().unwrap();
+    assert_eq!(codecs.len(), 6, "three codecs at two thread counts");
+    for c in codecs.iter().filter(|c| c["codec"] == "f32") {
+        assert_eq!(c["recall_at_k"], 1.0, "{c}");
+    }
+    assert!(codecs.iter().all(|c| c["ms_per_query"].as_f64().unwrap() >= 0.0));
+    assert_eq!(r["bandwidth"].as_array().unwrap().len(), 2);
+}
