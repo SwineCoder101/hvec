@@ -52,6 +52,38 @@
   year: 2025
   url: https://arxiv.org/abs/2506.23266
   note: "Clusters experts by cosine similarity, takes a joint SVD of each group's weights and merges the V matrices weighted by expert frequency. Code: github.com/siruihan2024/Sub-MoE. Suggests per-cluster subspaces for embedding codecs."
+- key: kwon2023pagedattention
+  topic: Embeddings and RAG
+  authors: Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph E. Gonzalez, Hao Zhang, Ion Stoica
+  title: Efficient Memory Management for Large Language Model Serving with PagedAttention
+  venue: arXiv:2309.06180 (SOSP 2023)
+  year: 2023
+  url: https://arxiv.org/abs/2309.06180
+  note: "The paper behind vLLM (github.com/vllm-project/vllm): the KV cache in fixed-size, shareable blocks. A model for growing code buffers without copying, and a local OpenAI-compatible chat server."
+- key: liu2024kivi
+  topic: Quantization
+  authors: Zirui Liu, Jiayi Yuan, Hongye Jin, Shaochen Zhong, Zhaozhuo Xu, Vladimir Braverman, Beidi Chen, Xia Hu
+  title: "KIVI: A Tuning-Free Asymmetric 2bit Quantization for KV Cache"
+  venue: arXiv:2402.02750
+  year: 2024
+  url: https://arxiv.org/abs/2402.02750
+  note: Quantizes keys per channel and values per token to 2 bits. Per-dimension treatment of keys is what mixed<B> does for embeddings.
+- key: hooper2024kvquant
+  topic: Quantization
+  authors: Coleman Hooper, Sehoon Kim, Hiva Mohammadzadeh, Michael W. Mahoney, Yakun Sophia Shao, Kurt Keutzer, Amir Gholami
+  title: "KVQuant: Towards 10 Million Context Length LLM Inference with KV Cache Quantization"
+  venue: arXiv:2401.18079
+  year: 2024
+  url: https://arxiv.org/abs/2401.18079
+  note: Per-channel key quantization with non-uniform levels and outliers kept apart. Attention scoring is compressed-domain dot-product search.
+- key: tang2024quest
+  topic: Sketches and indexes
+  authors: Jiaming Tang, Yilong Zhao, Kan Zhu, Guangxuan Xiao, Baris Kasikci, Song Han
+  title: "Quest: Query-Aware Sparsity for Efficient Long-Context LLM Inference"
+  venue: arXiv:2406.10774
+  year: 2024
+  url: https://arxiv.org/abs/2406.10774
+  note: Picks KV pages with a cheap per-page bound, then runs exact attention on those. Two-stage retrieval inside attention.
 - key: babenko2014aq
   topic: Quantization
   authors: Artem Babenko, Victor Lempitsky

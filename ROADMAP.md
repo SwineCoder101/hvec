@@ -230,6 +230,34 @@ Three lines of work, and what each would mean as an hvec codec or experiment:
   queries land in it. This is the natural next codec if `mixed<B>-pca` beats `pq<m>` at equal
   bytes.
 
+## Ideas from KV-cache compression and LLM serving
+
+Attention over a KV cache is a similarity scan: each new query vector is scored against every
+cached key by dot product. That is hvec's compressed-domain `score` in another setting, and the
+serving work around it maps onto hvec's codecs, hybrid retrieval and storage:
+
+- **KV-cache quantization** (KIVI, arXiv:2402.02750; KVQuant, arXiv:2401.18079). Both quantize
+  keys per channel and values per token, because a few key channels carry large outliers;
+  KVQuant adds non-uniform levels and keeps outliers apart in a sparse form. *In hvec:* per-channel
+  keys are per-dimension allocation, which is `mixed<B>`, and outlier channels are what `-w`
+  weights for. A natural experiment dumps real key vectors from a model and runs the codec grid
+  on them, with the noise-to-spacing ratio measured on attention scores.
+- **Query-aware sparse attention** (Quest, arXiv:2406.10774). A cheap bound per KV page picks the
+  pages likely to matter, then exact attention runs only on those. *In hvec:* that is two-stage
+  retrieval with pages as candidates; the depth-from-noise-and-band result may predict the page
+  budget a query needs.
+- **PagedAttention and vLLM** (arXiv:2309.06180, [code](https://github.com/vllm-project/vllm)).
+  The KV cache lives in fixed-size blocks rather than one contiguous allocation, so it grows
+  without copying and blocks can be shared between requests. *In hvec:* `CodeBuffer` is one
+  contiguous allocation per collection, invalidated and rebuilt on every write. Fixed-size blocks
+  would let agent memory (`bench memory`) append without rebuilding.
+- **vLLM as a chat server.** vLLM serves an OpenAI-compatible API, which hvec's `openai` provider
+  already speaks (as it does for Ollama), so it could run Experiments 1 and 3 locally without
+  spending API credit. Its prefix caching rewards prompts that start the same way: retrieved
+  passages in a stable order should hit the cache, and payload compression changes that, so
+  time-to-first-token belongs next to the answer metrics. vLLM targets GPUs first; on the Mac,
+  Ollama stays the practical local server.
+
 ## Next
 
 - Run Experiments 1 and 3 and the judge re-scoring as soon as two chat models are reachable;
