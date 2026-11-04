@@ -338,6 +338,11 @@ pub struct RescoreArgs {
     /// Self-queries used to calibrate the first stage's noise for the adaptive policy.
     #[arg(long, default_value_t = 200)]
     pub calibration_sample: usize,
+    /// Write per-query traces (first-stage ranks of the true neighbours, exact and
+    /// first-stage bands, margin depths on a 0.25σ grid) as JSON Lines, one line per first
+    /// stage, so routing policies can be replayed offline.
+    #[arg(long)]
+    pub trace: Option<PathBuf>,
     /// Neighbours per query.
     #[arg(short, long, default_value_t = 10)]
     pub k: usize,

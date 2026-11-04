@@ -77,6 +77,37 @@ pub struct Plan<'a> {
     pub noise: f64,
     /// Cap on any policy's per-query depth.
     pub max_depth: usize,
+    /// When non-empty, record a [`QueryTrace`] per query, with the margin
+    /// policy's depth at each of these margins.
+    pub trace_margins: &'a [f64],
+}
+
+/// Everything about one query that a routing policy could use or be judged
+/// by, so policies can be replayed offline without re-running the scan.
+///
+/// With an exact second stage, the query's recall at depth `N` is the number
+/// of `ranks` at most `N`, divided by k: any fixed, adaptive or oracle depth
+/// can be scored from this alone.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct QueryTrace {
+    /// First-stage rank (1-based) of each exact top-k neighbour, in exact order.
+    pub ranks: Vec<usize>,
+    /// Exact score gap from rank k to rank 2k: the true neighbour band.
+    pub band: f64,
+    /// The same gap measured on the first stage's own scores: the band a
+    /// router can see at query time without any exact scores.
+    pub band_hat: f64,
+    /// The margin policy's depth at each of the plan's `trace_margins`.
+    pub margin_depths: Vec<usize>,
+}
+
+/// The result of [`evaluate`].
+#[derive(Debug, Clone)]
+pub struct Evaluation {
+    pub profile: FirstStageProfile,
+    pub reports: Vec<RescoreReport>,
+    /// One per query when the plan asked for traces, otherwise empty.
+    pub traces: Vec<QueryTrace>,
 }
 
 /// One (first stage, second stage, policy) cell.
@@ -145,7 +176,7 @@ pub fn evaluate(
     k: usize,
     plan: &Plan<'_>,
     sources: Option<&[String]>,
-) -> Result<(FirstStageProfile, Vec<RescoreReport>), CodecError> {
+) -> Result<Evaluation, CodecError> {
     assert_eq!(ids.len(), vectors.len(), "ids and vectors must align");
     if let Some(s) = sources {
         assert_eq!(s.len(), ids.len(), "ids and sources must align");
@@ -197,6 +228,7 @@ pub fn evaluate(
     let mut bands: Vec<f64> = Vec::with_capacity(queries.len());
     let mut noise_sum = 0f64;
     let mut first_recall_sum = 0f64;
+    let mut traces: Vec<QueryTrace> = Vec::new();
 
     for q in queries {
         // Scores indexed like `ids`; the excluded id scores worst everywhere.
@@ -215,9 +247,16 @@ pub fn evaluate(
         let truth: Vec<i64> = exact_order.iter().take(k).map(|&i| ids[i]).collect();
 
         // Spacing and noise, exactly as `recall::evaluate` measures them.
+        let mut band = 0.0;
+        let mut band_hat = 0.0;
         if exact_order.len() >= 2 * k {
             let s = |r: usize| f64::from(exact[exact_order[r - 1]].1);
-            bands.push((s(k) - s(2 * k)).abs());
+            band = (s(k) - s(2 * k)).abs();
+            bands.push(band);
+        }
+        if n_live >= 2 * k {
+            let h = |r: usize| f64::from(approx[approx_order[r - 1]].1);
+            band_hat = (h(k) - h(2 * k)).abs();
         }
         noise_sum += centred_noise(&exact, &approx, &exact_order[..exact_order.len().min(2 * k)]);
 
@@ -229,6 +268,7 @@ pub fn evaluate(
         let ranks: Vec<usize> = exact_order.iter().take(k).map(|&i| rank_of[i]).collect();
         first_recall_sum += ranks.iter().filter(|&&r| r <= k).count() as f64 / k as f64;
         full_depths.push(ranks.iter().copied().max().unwrap_or(0) as f64);
+        let trace_ranks = (!plan.trace_margins.is_empty()).then(|| ranks.clone());
         pooled_ranks.extend(ranks);
 
         // The adaptive policy's depth: candidates within the margin of the
@@ -243,6 +283,14 @@ pub fn evaluate(
             };
             n.max(k).min(cap.min(n_live))
         };
+        if let Some(ranks) = trace_ranks {
+            traces.push(QueryTrace {
+                ranks,
+                band,
+                band_hat,
+                margin_depths: plan.trace_margins.iter().map(|&m| within(m)).collect(),
+            });
+        }
 
         let is_labelled = sources.is_some() && !q.relevant.is_empty();
         if is_labelled {
@@ -357,7 +405,11 @@ pub fn evaluate(
             }
         })
         .collect();
-    Ok((profile, reports))
+    Ok(Evaluation {
+        profile,
+        reports,
+        traces,
+    })
 }
 
 #[cfg(test)]
@@ -407,8 +459,9 @@ mod tests {
             margins,
             noise,
             max_depth,
+            trace_margins: &[],
         };
-        evaluate(
+        let e = evaluate(
             &ids,
             &vecs,
             &queries,
@@ -418,7 +471,9 @@ mod tests {
             &plan,
             None,
         )
-        .unwrap()
+        .unwrap();
+        assert!(e.traces.is_empty());
+        (e.profile, e.reports)
     }
 
     fn fixed(reports: &[RescoreReport]) -> Vec<&RescoreReport> {
@@ -507,5 +562,64 @@ mod tests {
         // Depth is capped at the collection size.
         let (_, all) = run(&[&i8c], &[1000], &[], 0.0, 1000);
         assert_eq!(fixed(&all)[0].depth, 320);
+    }
+
+    #[test]
+    fn traces_replay_the_fixed_and_margin_cells() {
+        let (ids, vecs) = clustered();
+        let queries = self_queries(&ids, &vecs, 30);
+        let f32c = F32Codec::new(64);
+        let noise = profile_noise();
+        let margins = [1.0, 2.0];
+        let plan = Plan {
+            seconds: &[&f32c],
+            depths: &[10, 20, 40],
+            margins: &margins,
+            noise,
+            max_depth: 200,
+            trace_margins: &margins,
+        };
+        let e = evaluate(
+            &ids,
+            &vecs,
+            &queries,
+            &BinaryCodec::new(64),
+            Metric::Cosine,
+            10,
+            &plan,
+            None,
+        )
+        .unwrap();
+        assert_eq!(e.traces.len(), 30);
+        let replay = |depth_of: &dyn Fn(&QueryTrace) -> usize| -> f64 {
+            e.traces
+                .iter()
+                .map(|t| t.ranks.iter().filter(|&&r| r <= depth_of(t)).count() as f64 / 10.0)
+                .sum::<f64>()
+                / 30.0
+        };
+        for r in &e.reports {
+            let replayed = match r.policy {
+                Policy::None => replay(&|_| 10),
+                Policy::Fixed { depth } => replay(&|_| depth),
+                Policy::Margin { sigmas } => {
+                    let m = margins.iter().position(|&x| x == sigmas).unwrap();
+                    let mean: f64 = e.traces.iter().map(|t| t.margin_depths[m] as f64).sum::<f64>() / 30.0;
+                    assert!((mean - r.mean_depth).abs() < 1e-9);
+                    replay(&|t| t.margin_depths[m])
+                }
+            };
+            assert!(
+                (replayed - r.recall_at_k).abs() < 1e-9,
+                "{:?}: {replayed} vs {}",
+                r.policy,
+                r.recall_at_k
+            );
+        }
+        assert!(
+            e.traces
+                .iter()
+                .all(|t| t.band > 0.0 && t.band_hat > 0.0 && t.ranks.len() == 10)
+        );
     }
 }
