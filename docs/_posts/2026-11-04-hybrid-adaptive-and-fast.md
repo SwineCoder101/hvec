@@ -1,6 +1,6 @@
 ---
 title: "Hybrid, adaptive, and finally fast"
-date: 2026-11-05 10:00:00 +0000
+date: 2026-11-04 22:30:00 +0000
 references: [li2024quantmoe, charikar2002simhash, jegou2011pq]
 ---
 

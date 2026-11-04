@@ -1,6 +1,6 @@
 ---
 title: "Zero-copy scan: which codecs are actually faster?"
-date: 2026-11-04 23:00:00 +0000
+date: 2026-11-04 22:20:00 +0000
 result: "Copying was most of the original search's cost: a contiguous in-place scan is 5.1× faster. Fewer bytes do not make a scan faster, except with popcount: binary-hamming plus an f32 re-score reaches 95% recall@10 on FiQA about 19× faster than exact f32."
 references: [charikar2002simhash, jegou2011pq, thakur2021beir, maia2018fiqa, xiao2023bge]
 ---
