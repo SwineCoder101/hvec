@@ -6,15 +6,20 @@
 //! by brute-force scan. That is deliberate: the point of hvec is to measure
 //! the codec, not an index.
 
+mod codes;
 mod runs;
 mod schema;
 mod sessions;
 mod vectors;
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 
 use rusqlite::Connection;
 
+pub use codes::{CodeBuffer, CodeFileError, Scored};
 pub use runs::RunRow;
 pub use sessions::{Session, StoredMessage};
 pub use vectors::{Collection, Hit, NewChunk, NewCollection};
@@ -62,6 +67,17 @@ pub enum StoreError {
 #[derive(Debug)]
 pub struct Store {
     conn: Connection,
+    /// Columnar copies of collections' codes, built on first search and
+    /// reused until the collection changes. Dropped on this handle's own
+    /// writes, and wholesale when another connection commits (SQLite's
+    /// `data_version` moves).
+    codes: RefCell<CodeCache>,
+}
+
+#[derive(Debug, Default)]
+struct CodeCache {
+    data_version: i64,
+    by_collection: HashMap<String, Arc<CodeBuffer>>,
 }
 
 impl Store {
@@ -90,7 +106,10 @@ impl Store {
                 conn.execute_batch(alter)?;
             }
         }
-        Ok(Self { conn })
+        Ok(Self {
+            conn,
+            codes: RefCell::new(CodeCache::default()),
+        })
     }
 
     fn has_column(conn: &Connection, table: &str, column: &str) -> Result<bool> {
