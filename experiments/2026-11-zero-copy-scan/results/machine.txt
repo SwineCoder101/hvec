@@ -1,0 +1,4 @@
+hvec 8f87908
+Apple M4 Pro
+performance and efficiency cores: 10 4
+memory: 26 GB
