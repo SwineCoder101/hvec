@@ -111,8 +111,8 @@ impl MixedCodec {
     }
 
     /// Calls `f(dimension, reconstructed value)` for every dimension.
-    fn for_each_value(fit: &Fitted, encoded: &Encoded, mut f: impl FnMut(usize, f64)) {
-        let mut reader = BitReader::new(&encoded.0);
+    fn for_each_value(fit: &Fitted, encoded: &[u8], mut f: impl FnMut(usize, f64)) {
+        let mut reader = BitReader::new(encoded);
         for (i, &b) in fit.bits.iter().enumerate() {
             let m = f64::from(fit.mean[i]);
             if b == 0 {
@@ -447,8 +447,8 @@ impl Codec for MixedCodec {
         Ok(Encoded(w.finish(self.bytes)))
     }
 
-    fn decode(&self, encoded: &Encoded) -> Result<Vector, CodecError> {
-        check_payload(self.bytes, encoded.0.len())?;
+    fn decode(&self, encoded: &[u8]) -> Result<Vector, CodecError> {
+        check_payload(self.bytes, encoded.len())?;
         let f = self.state()?;
         let mut y = vec![0f32; self.dimension];
         Self::for_each_value(f, encoded, |i, v| y[i] = v as f32);
@@ -468,7 +468,7 @@ impl Codec for MixedCodec {
         })
     }
 
-    fn score(&self, query: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
+    fn score(&self, query: &[f32], encoded: &[u8], metric: Metric) -> Result<f32, CodecError> {
         let prepared = self.prepare_query(query)?;
         self.score_prepared(&prepared, encoded, metric)
     }
@@ -478,9 +478,9 @@ impl Codec for MixedCodec {
         Ok(Self::rotate(self.state()?, query))
     }
 
-    fn score_prepared(&self, prepared: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
+    fn score_prepared(&self, prepared: &[f32], encoded: &[u8], metric: Metric) -> Result<f32, CodecError> {
         check_dim(self.dimension, prepared.len())?;
-        check_payload(self.bytes, encoded.0.len())?;
+        check_payload(self.bytes, encoded.len())?;
         let f = self.state()?;
         let (mut dot, mut stored_sq, mut query_sq) = (0f64, 0f64, 0f64);
         Self::for_each_value(f, encoded, |i, v| {

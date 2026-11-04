@@ -4,7 +4,9 @@ use hvec_core::{Codec, CodecError, Encoded, Metric};
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
-use crate::{Result, Store, StoreError};
+use std::sync::Arc;
+
+use crate::{CodeBuffer, Result, Store, StoreError};
 
 /// Metadata for a collection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -140,6 +142,7 @@ impl Store {
         if n == 0 {
             return Err(StoreError::NoSuchCollection(name.to_owned()));
         }
+        self.forget_codes(name);
         Ok(())
     }
 
@@ -156,7 +159,66 @@ impl Store {
             }
         }
         tx.commit()?;
+        self.forget_codes(collection);
         Ok(chunks.len())
+    }
+
+    /// Drop the cached code buffer for a collection after a write.
+    fn forget_codes(&self, collection: &str) {
+        self.codes.borrow_mut().by_collection.remove(collection);
+    }
+
+    /// Read a collection's codes into one contiguous buffer, in id order.
+    /// Each blob is borrowed from SQLite's row and appended, so the whole
+    /// collection costs one copy, not one allocation per vector.
+    pub fn load_codes(&self, collection: &str) -> Result<CodeBuffer> {
+        let c = self.require_collection(collection)?;
+        let size = c.codec()?.encoded_size();
+        let mut buf = CodeBuffer::new(size);
+        let mut stmt = self
+            .conn
+            .prepare_cached("SELECT id, source, vector FROM chunks WHERE collection = ?1 ORDER BY id")?;
+        let mut rows = stmt.query(params![collection])?;
+        while let Some(row) = rows.next()? {
+            let blob = row.get_ref(2)?.as_blob().map_err(rusqlite::Error::from)?;
+            if blob.len() != size {
+                return Err(StoreError::Codec(CodecError::PayloadSize {
+                    expected: size,
+                    got: blob.len(),
+                }));
+            }
+            buf.push(row.get(0)?, row.get(1)?, blob);
+        }
+        Ok(buf)
+    }
+
+    /// The cached code buffer for a collection, loaded on first use.
+    pub fn codes(&self, collection: &str) -> Result<Arc<CodeBuffer>> {
+        let version: i64 = self.conn.query_row("PRAGMA data_version", [], |r| r.get(0))?;
+        {
+            let mut cache = self.codes.borrow_mut();
+            if cache.data_version != version {
+                cache.by_collection.clear();
+                cache.data_version = version;
+            }
+            if let Some(b) = cache.by_collection.get(collection) {
+                return Ok(Arc::clone(b));
+            }
+        }
+        let b = Arc::new(self.load_codes(collection)?);
+        self.codes
+            .borrow_mut()
+            .by_collection
+            .insert(collection.to_owned(), Arc::clone(&b));
+        Ok(b)
+    }
+
+    /// Ask SQLite to memory-map up to `bytes` of the database file, so
+    /// borrowed blobs are read from the OS page cache without a copy into
+    /// SQLite's own buffers. `0` turns it off.
+    pub fn set_mmap_size(&self, bytes: u64) -> Result<()> {
+        self.conn.execute_batch(&format!("PRAGMA mmap_size = {bytes}"))?;
+        Ok(())
     }
 
     /// Every stored chunk's id and encoded vector, in insertion order.
@@ -205,8 +267,74 @@ impl Store {
     /// Brute-force top-k search scored through the codec.
     ///
     /// Scores every stored vector against `query` in the compressed domain,
-    /// then keeps the best `k` according to the metric's direction.
+    /// in place in the collection's cached [`CodeBuffer`], then reads source,
+    /// ordinal and text for the best `k` only.
     pub fn search(
+        &self,
+        collection: &str,
+        query: &[f32],
+        k: usize,
+        codec: &dyn Codec,
+        metric: Metric,
+    ) -> Result<Vec<Hit>> {
+        let buf = self.codes(collection)?;
+        let top = buf.search(query, k, codec, metric)?;
+        let mut stmt = self
+            .conn
+            .prepare_cached("SELECT source, ordinal, text FROM chunks WHERE id = ?1")?;
+        let mut hits = Vec::with_capacity(top.len());
+        for s in top {
+            let chunk_id = buf.ids()[s.index];
+            let (source, ordinal, text) = stmt.query_row(params![chunk_id], |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, u32>(1)?, r.get::<_, String>(2)?))
+            })?;
+            hits.push(Hit {
+                chunk_id,
+                source,
+                ordinal,
+                text,
+                score: s.score,
+            });
+        }
+        Ok(hits)
+    }
+
+    /// Search straight off SQLite's rows with each blob borrowed in place:
+    /// the vector column only, no copy per vector, no text. Returns `(chunk
+    /// id, score)` for the best `k`. Measures what SQLite's row machinery
+    /// costs compared with the contiguous buffer.
+    pub fn search_borrowed(
+        &self,
+        collection: &str,
+        query: &[f32],
+        k: usize,
+        codec: &dyn Codec,
+        metric: Metric,
+    ) -> Result<Vec<(i64, f32)>> {
+        self.require_collection(collection)?;
+        let prepared = codec.prepare_query(query)?;
+        let mut stmt = self
+            .conn
+            .prepare_cached("SELECT id, vector FROM chunks WHERE collection = ?1 ORDER BY id")?;
+        let mut rows = stmt.query(params![collection])?;
+        let mut all: Vec<(i64, f32)> = Vec::new();
+        while let Some(row) = rows.next()? {
+            let blob = row.get_ref(1)?.as_blob().map_err(rusqlite::Error::from)?;
+            all.push((row.get(0)?, codec.score_prepared(&prepared, blob, metric)?));
+        }
+        if metric.higher_is_better() {
+            all.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+        } else {
+            all.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
+        }
+        all.truncate(k);
+        Ok(all)
+    }
+
+    /// The original search path: every row, text included, read out of
+    /// SQLite and scored on every query. Kept to measure what the columnar
+    /// buffer saves; results are the same as [`Store::search`].
+    pub fn search_by_rows(
         &self,
         collection: &str,
         query: &[f32],
@@ -288,6 +416,73 @@ mod tests {
             })
             .unwrap();
         (store, F32Codec::new(2))
+    }
+
+    fn chunk(codec: &F32Codec, source: &str, ordinal: u32, v: [f32; 2]) -> NewChunk {
+        NewChunk {
+            source: source.into(),
+            ordinal,
+            text: format!("{source}#{ordinal}"),
+            vector: codec.encode(&v).unwrap(),
+        }
+    }
+
+    #[test]
+    fn buffered_search_matches_the_row_scan_and_sees_new_chunks() {
+        let (mut store, codec) = store_with_collection();
+        let chunks: Vec<NewChunk> = (0..40)
+            .map(|i| {
+                let a = i as f32 * 0.15;
+                chunk(&codec, &format!("d{}", i % 7), i, [a.cos(), a.sin()])
+            })
+            .collect();
+        store.insert_chunks("docs", &chunks).unwrap();
+        let q = [0.6f32, 0.8];
+        let rows = store.search_by_rows("docs", &q, 5, &codec, Metric::Cosine).unwrap();
+        let buffered = store.search("docs", &q, 5, &codec, Metric::Cosine).unwrap();
+        assert_eq!(rows, buffered);
+        assert_eq!(store.codes("docs").unwrap().len(), 40);
+
+        // A write through this handle is visible to the next search.
+        store
+            .insert_chunks("docs", &[chunk(&codec, "new", 0, [0.6, 0.8])])
+            .unwrap();
+        let after = store.search("docs", &q, 1, &codec, Metric::Cosine).unwrap();
+        assert_eq!(after[0].source, "new");
+        assert_eq!(store.codes("docs").unwrap().len(), 41);
+        assert_eq!(
+            after,
+            store.search_by_rows("docs", &q, 1, &codec, Metric::Cosine).unwrap()
+        );
+    }
+
+    #[test]
+    fn another_connections_commit_invalidates_the_cache() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("hvec.db");
+        let codec = F32Codec::new(2);
+        let mut a = Store::open(&path).unwrap();
+        a.create_collection(&NewCollection {
+            name: "docs",
+            embed_profile: "local",
+            embed_model: "test-model",
+            dimension: 2,
+            codec: "f32",
+            metric: Metric::Cosine,
+            codec_params: &[],
+        })
+        .unwrap();
+        a.insert_chunks("docs", &[chunk(&codec, "first", 0, [1.0, 0.0])])
+            .unwrap();
+        assert_eq!(a.codes("docs").unwrap().len(), 1);
+        let mut b = Store::open(&path).unwrap();
+        b.insert_chunks("docs", &[chunk(&codec, "second", 0, [0.0, 1.0])])
+            .unwrap();
+        assert_eq!(a.codes("docs").unwrap().len(), 2);
+        let hit = a.search("docs", &[0.0, 1.0], 1, &codec, Metric::Cosine).unwrap();
+        assert_eq!(hit[0].source, "second");
+        a.set_mmap_size(1 << 20).unwrap();
+        assert_eq!(a.load_codes("docs").unwrap().len(), 2);
     }
 
     #[test]

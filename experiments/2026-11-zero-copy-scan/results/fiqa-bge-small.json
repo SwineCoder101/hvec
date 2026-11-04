@@ -1,0 +1,386 @@
+{
+  "collection": "fiqa-bge-small",
+  "vectors": 71274,
+  "dimension": 384,
+  "queries": 50,
+  "k": 10,
+  "repeat": 3,
+  "paths": [
+    {
+      "path": "sqlite rows, copied",
+      "ms_per_query": 74.70102331999999,
+      "note": "the original search: every row and its text copied out on every query"
+    },
+    {
+      "path": "sqlite rows, borrowed",
+      "ms_per_query": 54.501525,
+      "note": "vector column only, each blob scored in place in SQLite's page buffer"
+    },
+    {
+      "path": "sqlite rows, borrowed, mmap",
+      "ms_per_query": 27.397842500000003,
+      "note": "as above, with SQLite reading the file through its memory map"
+    },
+    {
+      "path": "cached buffer (Store::search)",
+      "ms_per_query": 14.67806916,
+      "note": "codes scanned in place in one allocation; text read for the hits only"
+    }
+  ],
+  "loads": [
+    {
+      "source": "sqlite (borrowed blobs, one copy)",
+      "ms": 46.746415999999996,
+      "bytes": 109476864
+    },
+    {
+      "source": "flat code file (one read)",
+      "ms": 8.648792,
+      "bytes": 109476864
+    }
+  ],
+  "codecs": [
+    {
+      "codec": "f32",
+      "bytes_per_vector": 1536,
+      "threads": 1,
+      "ms_per_query": 14.762140839999999,
+      "gb_per_s": 7.416056057625312,
+      "recall_at_k": 1.0
+    },
+    {
+      "codec": "f32",
+      "bytes_per_vector": 1536,
+      "threads": 2,
+      "ms_per_query": 7.555813340000001,
+      "gb_per_s": 14.489090594712865,
+      "recall_at_k": 1.0
+    },
+    {
+      "codec": "f32",
+      "bytes_per_vector": 1536,
+      "threads": 4,
+      "ms_per_query": 3.9961374999999997,
+      "gb_per_s": 27.39566994378947,
+      "recall_at_k": 1.0
+    },
+    {
+      "codec": "f32",
+      "bytes_per_vector": 1536,
+      "threads": 8,
+      "ms_per_query": 2.0923091799999995,
+      "gb_per_s": 52.323463972948794,
+      "recall_at_k": 1.0
+    },
+    {
+      "codec": "f32",
+      "bytes_per_vector": 1536,
+      "threads": 10,
+      "ms_per_query": 1.7055316600000001,
+      "gb_per_s": 64.18928863507583,
+      "recall_at_k": 1.0
+    },
+    {
+      "codec": "int8",
+      "bytes_per_vector": 392,
+      "threads": 1,
+      "ms_per_query": 18.63756416,
+      "gb_per_s": 1.4990911773741145,
+      "recall_at_k": 0.978
+    },
+    {
+      "codec": "int8",
+      "bytes_per_vector": 392,
+      "threads": 2,
+      "ms_per_query": 9.54470416,
+      "gb_per_s": 2.927215713724122,
+      "recall_at_k": 0.978
+    },
+    {
+      "codec": "int8",
+      "bytes_per_vector": 392,
+      "threads": 4,
+      "ms_per_query": 4.8968275,
+      "gb_per_s": 5.70561409402312,
+      "recall_at_k": 0.978
+    },
+    {
+      "codec": "int8",
+      "bytes_per_vector": 392,
+      "threads": 8,
+      "ms_per_query": 2.5602358400000003,
+      "gb_per_s": 10.912825905913415,
+      "recall_at_k": 0.978
+    },
+    {
+      "codec": "int8",
+      "bytes_per_vector": 392,
+      "threads": 10,
+      "ms_per_query": 2.0892375,
+      "gb_per_s": 13.373016710642041,
+      "recall_at_k": 0.978
+    },
+    {
+      "codec": "binary",
+      "bytes_per_vector": 48,
+      "threads": 1,
+      "ms_per_query": 17.555124160000002,
+      "gb_per_s": 0.1948805356669149,
+      "recall_at_k": 0.504
+    },
+    {
+      "codec": "binary",
+      "bytes_per_vector": 48,
+      "threads": 2,
+      "ms_per_query": 8.919795,
+      "gb_per_s": 0.3835460344099836,
+      "recall_at_k": 0.504
+    },
+    {
+      "codec": "binary",
+      "bytes_per_vector": 48,
+      "threads": 4,
+      "ms_per_query": 4.58119334,
+      "gb_per_s": 0.7467818417809889,
+      "recall_at_k": 0.504
+    },
+    {
+      "codec": "binary",
+      "bytes_per_vector": 48,
+      "threads": 8,
+      "ms_per_query": 2.4290616800000002,
+      "gb_per_s": 1.4084253307227668,
+      "recall_at_k": 0.504
+    },
+    {
+      "codec": "binary",
+      "bytes_per_vector": 48,
+      "threads": 10,
+      "ms_per_query": 1.96065,
+      "gb_per_s": 1.7449070461326601,
+      "recall_at_k": 0.504
+    },
+    {
+      "codec": "binary-centred",
+      "bytes_per_vector": 48,
+      "threads": 1,
+      "ms_per_query": 20.47594916,
+      "gb_per_s": 0.1670814853693454,
+      "recall_at_k": 0.562
+    },
+    {
+      "codec": "binary-centred",
+      "bytes_per_vector": 48,
+      "threads": 2,
+      "ms_per_query": 10.372313339999998,
+      "gb_per_s": 0.32983500284421613,
+      "recall_at_k": 0.562
+    },
+    {
+      "codec": "binary-centred",
+      "bytes_per_vector": 48,
+      "threads": 4,
+      "ms_per_query": 5.340729179999999,
+      "gb_per_s": 0.6405776972948852,
+      "recall_at_k": 0.562
+    },
+    {
+      "codec": "binary-centred",
+      "bytes_per_vector": 48,
+      "threads": 8,
+      "ms_per_query": 2.7814266799999996,
+      "gb_per_s": 1.2299989874261221,
+      "recall_at_k": 0.562
+    },
+    {
+      "codec": "binary-centred",
+      "bytes_per_vector": 48,
+      "threads": 10,
+      "ms_per_query": 2.29705584,
+      "gb_per_s": 1.4893638806795397,
+      "recall_at_k": 0.562
+    },
+    {
+      "codec": "binary-hamming",
+      "bytes_per_vector": 48,
+      "threads": 1,
+      "ms_per_query": 0.71837084,
+      "gb_per_s": 4.762375933856113,
+      "recall_at_k": 0.372
+    },
+    {
+      "codec": "binary-hamming",
+      "bytes_per_vector": 48,
+      "threads": 2,
+      "ms_per_query": 0.415375,
+      "gb_per_s": 8.236297321697261,
+      "recall_at_k": 0.372
+    },
+    {
+      "codec": "binary-hamming",
+      "bytes_per_vector": 48,
+      "threads": 4,
+      "ms_per_query": 0.24892999999999998,
+      "gb_per_s": 13.743429879885914,
+      "recall_at_k": 0.372
+    },
+    {
+      "codec": "binary-hamming",
+      "bytes_per_vector": 48,
+      "threads": 8,
+      "ms_per_query": 0.17952500000000002,
+      "gb_per_s": 19.05668848349812,
+      "recall_at_k": 0.372
+    },
+    {
+      "codec": "binary-hamming",
+      "bytes_per_vector": 48,
+      "threads": 10,
+      "ms_per_query": 0.16839834,
+      "gb_per_s": 20.31582971661122,
+      "recall_at_k": 0.372
+    },
+    {
+      "codec": "pq48",
+      "bytes_per_vector": 48,
+      "threads": 1,
+      "ms_per_query": 14.4423525,
+      "gb_per_s": 0.23688329169364894,
+      "recall_at_k": 0.644
+    },
+    {
+      "codec": "pq48",
+      "bytes_per_vector": 48,
+      "threads": 2,
+      "ms_per_query": 7.364075839999999,
+      "gb_per_s": 0.4645731622448908,
+      "recall_at_k": 0.644
+    },
+    {
+      "codec": "pq48",
+      "bytes_per_vector": 48,
+      "threads": 4,
+      "ms_per_query": 3.7834966599999995,
+      "gb_per_s": 0.9042302154430871,
+      "recall_at_k": 0.644
+    },
+    {
+      "codec": "pq48",
+      "bytes_per_vector": 48,
+      "threads": 8,
+      "ms_per_query": 1.9979866600000002,
+      "gb_per_s": 1.7122997207598973,
+      "recall_at_k": 0.644
+    },
+    {
+      "codec": "pq48",
+      "bytes_per_vector": 48,
+      "threads": 10,
+      "ms_per_query": 1.6209075000000002,
+      "gb_per_s": 2.110639873034087,
+      "recall_at_k": 0.644
+    },
+    {
+      "codec": "pq24",
+      "bytes_per_vector": 24,
+      "threads": 1,
+      "ms_per_query": 14.055774999999999,
+      "gb_per_s": 0.12169915924237547,
+      "recall_at_k": 0.422
+    },
+    {
+      "codec": "pq24",
+      "bytes_per_vector": 24,
+      "threads": 2,
+      "ms_per_query": 7.25184666,
+      "gb_per_s": 0.23588143547425752,
+      "recall_at_k": 0.422
+    },
+    {
+      "codec": "pq24",
+      "bytes_per_vector": 24,
+      "threads": 4,
+      "ms_per_query": 3.78886416,
+      "gb_per_s": 0.4514746181874201,
+      "recall_at_k": 0.422
+    },
+    {
+      "codec": "pq24",
+      "bytes_per_vector": 24,
+      "threads": 8,
+      "ms_per_query": 1.9864024999999998,
+      "gb_per_s": 0.8611426938900854,
+      "recall_at_k": 0.422
+    },
+    {
+      "codec": "pq24",
+      "bytes_per_vector": 24,
+      "threads": 10,
+      "ms_per_query": 1.6198083399999998,
+      "gb_per_s": 1.0560360493019811,
+      "recall_at_k": 0.422
+    },
+    {
+      "codec": "mixed48-pca-w",
+      "bytes_per_vector": 48,
+      "threads": 1,
+      "ms_per_query": 32.93501834,
+      "gb_per_s": 0.10387581888317844,
+      "recall_at_k": 0.708
+    },
+    {
+      "codec": "mixed48-pca-w",
+      "bytes_per_vector": 48,
+      "threads": 2,
+      "ms_per_query": 17.341954180000002,
+      "gb_per_s": 0.19727603731911142,
+      "recall_at_k": 0.708
+    },
+    {
+      "codec": "mixed48-pca-w",
+      "bytes_per_vector": 48,
+      "threads": 4,
+      "ms_per_query": 8.489275,
+      "gb_per_s": 0.40299695792632473,
+      "recall_at_k": 0.708
+    },
+    {
+      "codec": "mixed48-pca-w",
+      "bytes_per_vector": 48,
+      "threads": 8,
+      "ms_per_query": 4.59580332,
+      "gb_per_s": 0.7444078351029173,
+      "recall_at_k": 0.708
+    },
+    {
+      "codec": "mixed48-pca-w",
+      "bytes_per_vector": 48,
+      "threads": 10,
+      "ms_per_query": 3.839975,
+      "gb_per_s": 0.8909308003307314,
+      "recall_at_k": 0.708
+    }
+  ],
+  "bandwidth": [
+    {
+      "threads": 1,
+      "gb_per_s": 77.78271917417484
+    },
+    {
+      "threads": 2,
+      "gb_per_s": 142.4131603362236
+    },
+    {
+      "threads": 4,
+      "gb_per_s": 148.250571122847
+    },
+    {
+      "threads": 8,
+      "gb_per_s": 208.80437248922377
+    },
+    {
+      "threads": 10,
+      "gb_per_s": 238.32240700472343
+    }
+  ]
+}

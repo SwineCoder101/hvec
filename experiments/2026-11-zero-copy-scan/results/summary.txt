@@ -1,0 +1,112 @@
+== fiqa-bge-small: 71274 vectors × 384 dims, 50 queries, k=10
+   storage path (f32)                  ms/query  speed-up
+   sqlite rows, copied                    74.70      1.0×
+   sqlite rows, borrowed                  54.50      1.4×
+   sqlite rows, borrowed, mmap            27.40      2.7×
+   cached buffer (Store::search)          14.68      5.1×
+   building the buffer                       ms        MB
+   sqlite (borrowed blobs, one copy)       46.7     109.5
+   flat code file (one read)                8.6     109.5
+   memory bandwidth: 1 thread(s) 78 GB/s, 2 thread(s) 142 GB/s, 4 thread(s) 148 GB/s, 8 thread(s) 209 GB/s, 10 thread(s) 238 GB/s
+   codec             B/vec  thr  ms/query  ns/vector    GB/s   % bw  recall@10
+   f32                1536    1    14.762     207.12    7.42   9.5%     1.0000
+   f32                1536    2     7.556     106.01   14.49  10.2%     1.0000
+   f32                1536    4     3.996      56.07   27.40  18.5%     1.0000
+   f32                1536    8     2.092      29.36   52.32  25.1%     1.0000
+   f32                1536   10     1.706      23.93   64.19  26.9%     1.0000
+   int8                392    1    18.638     261.49    1.50   1.9%     0.9780
+   int8                392    2     9.545     133.92    2.93   2.1%     0.9780
+   int8                392    4     4.897      68.70    5.71   3.8%     0.9780
+   int8                392    8     2.560      35.92   10.91   5.2%     0.9780
+   int8                392   10     2.089      29.31   13.37   5.6%     0.9780
+   binary               48    1    17.555     246.30    0.19   0.3%     0.5040
+   binary               48    2     8.920     125.15    0.38   0.3%     0.5040
+   binary               48    4     4.581      64.28    0.75   0.5%     0.5040
+   binary               48    8     2.429      34.08    1.41   0.7%     0.5040
+   binary               48   10     1.961      27.51    1.74   0.7%     0.5040
+   binary-centred       48    1    20.476     287.28    0.17   0.2%     0.5620
+   binary-centred       48    2    10.372     145.53    0.33   0.2%     0.5620
+   binary-centred       48    4     5.341      74.93    0.64   0.4%     0.5620
+   binary-centred       48    8     2.781      39.02    1.23   0.6%     0.5620
+   binary-centred       48   10     2.297      32.23    1.49   0.6%     0.5620
+   binary-hamming       48    1     0.718      10.08    4.76   6.1%     0.3720
+   binary-hamming       48    2     0.415       5.83    8.24   5.8%     0.3720
+   binary-hamming       48    4     0.249       3.49   13.74   9.3%     0.3720
+   binary-hamming       48    8     0.180       2.52   19.06   9.1%     0.3720
+   binary-hamming       48   10     0.168       2.36   20.32   8.5%     0.3720
+   pq48                 48    1    14.442     202.63    0.24   0.3%     0.6440
+   pq48                 48    2     7.364     103.32    0.46   0.3%     0.6440
+   pq48                 48    4     3.783      53.08    0.90   0.6%     0.6440
+   pq48                 48    8     1.998      28.03    1.71   0.8%     0.6440
+   pq48                 48   10     1.621      22.74    2.11   0.9%     0.6440
+   pq24                 24    1    14.056     197.21    0.12   0.2%     0.4220
+   pq24                 24    2     7.252     101.75    0.24   0.2%     0.4220
+   pq24                 24    4     3.789      53.16    0.45   0.3%     0.4220
+   pq24                 24    8     1.986      27.87    0.86   0.4%     0.4220
+   pq24                 24   10     1.620      22.73    1.06   0.4%     0.4220
+   mixed48-pca-w        48    1    32.935     462.09    0.10   0.1%     0.7080
+   mixed48-pca-w        48    2    17.342     243.31    0.20   0.1%     0.7080
+   mixed48-pca-w        48    4     8.489     119.11    0.40   0.3%     0.7080
+   mixed48-pca-w        48    8     4.596      64.48    0.74   0.4%     0.7080
+   mixed48-pca-w        48   10     3.840      53.88    0.89   0.4%     0.7080
+   hybrid estimate, 1 thread: scan + N f32 re-scores at 207.1 ns each (random access ignored)
+     binary-hamming   scan 0.718 ms → N=50: 0.729 ms, N=100: 0.739 ms, N=200: 0.760 ms  (exact f32 scan 14.762 ms)
+     binary           scan 17.555 ms → N=50: 17.565 ms, N=100: 17.576 ms, N=200: 17.597 ms  (exact f32 scan 14.762 ms)
+     pq48             scan 14.442 ms → N=50: 14.453 ms, N=100: 14.463 ms, N=200: 14.484 ms  (exact f32 scan 14.762 ms)
+
+== scifact-bge-small: 8036 vectors × 384 dims, 50 queries, k=10
+   storage path (f32)                  ms/query  speed-up
+   sqlite rows, copied                     8.75      1.0×
+   sqlite rows, borrowed                   6.41      1.4×
+   sqlite rows, borrowed, mmap             3.01      2.9×
+   cached buffer (Store::search)           1.68      5.2×
+   building the buffer                       ms        MB
+   sqlite (borrowed blobs, one copy)        6.6      12.3
+   flat code file (one read)                1.8      12.3
+   memory bandwidth: 1 thread(s) 84 GB/s, 2 thread(s) 139 GB/s, 4 thread(s) 209 GB/s, 8 thread(s) 225 GB/s, 10 thread(s) 239 GB/s
+   codec             B/vec  thr  ms/query  ns/vector    GB/s   % bw  recall@10
+   f32                1536    1     1.648     205.02    7.49   8.9%     1.0000
+   f32                1536    2     0.882     109.79   13.99  10.1%     1.0000
+   f32                1536    4     0.502      62.52   24.57  11.8%     1.0000
+   f32                1536    8     0.316      39.37   39.01  17.4%     1.0000
+   f32                1536   10     0.285      35.48   43.29  18.1%     1.0000
+   int8                392    1     2.104     261.78    1.50   1.8%     0.9840
+   int8                392    2     1.107     137.80    2.84   2.1%     0.9840
+   int8                392    4     0.612      76.21    5.14   2.5%     0.9840
+   int8                392    8     0.368      45.81    8.56   3.8%     0.9840
+   int8                392   10     0.324      40.34    9.72   4.1%     0.9840
+   binary               48    1     1.977     245.96    0.20   0.2%     0.6300
+   binary               48    2     1.030     128.13    0.37   0.3%     0.6300
+   binary               48    4     0.569      70.85    0.68   0.3%     0.6300
+   binary               48    8     0.347      43.20    1.11   0.5%     0.6300
+   binary               48   10     0.309      38.46    1.25   0.5%     0.6300
+   binary-centred       48    1     2.309     287.33    0.17   0.2%     0.6600
+   binary-centred       48    2     1.199     149.24    0.32   0.2%     0.6600
+   binary-centred       48    4     0.652      81.18    0.59   0.3%     0.6600
+   binary-centred       48    8     0.391      48.70    0.99   0.4%     0.6600
+   binary-centred       48   10     0.342      42.53    1.13   0.5%     0.6600
+   binary-hamming       48    1     0.088      10.95    4.38   5.2%     0.5160
+   binary-hamming       48    2     0.072       8.90    5.39   3.9%     0.5160
+   binary-hamming       48    4     0.078       9.71    4.95   2.4%     0.5160
+   binary-hamming       48    8     0.096      11.97    4.01   1.8%     0.5160
+   binary-hamming       48   10     0.108      13.46    3.57   1.5%     0.5160
+   pq48                 48    1     1.640     204.09    0.24   0.3%     0.7320
+   pq48                 48    2     0.872     108.56    0.44   0.3%     0.7320
+   pq48                 48    4     0.488      60.78    0.79   0.4%     0.7320
+   pq48                 48    8     0.302      37.54    1.28   0.6%     0.7320
+   pq48                 48   10     0.278      34.56    1.39   0.6%     0.7320
+   pq24                 24    1     1.619     201.52    0.12   0.1%     0.6260
+   pq24                 24    2     0.850     105.77    0.23   0.2%     0.6260
+   pq24                 24    4     0.484      60.21    0.40   0.2%     0.6260
+   pq24                 24    8     0.306      38.12    0.63   0.3%     0.6260
+   pq24                 24   10     0.288      35.88    0.67   0.3%     0.6260
+   mixed48-pca-w        48    1     3.977     494.92    0.10   0.1%     0.7240
+   mixed48-pca-w        48    2     2.133     265.39    0.18   0.1%     0.7240
+   mixed48-pca-w        48    4     1.143     142.30    0.34   0.2%     0.7240
+   mixed48-pca-w        48    8     0.659      81.98    0.59   0.3%     0.7240
+   mixed48-pca-w        48   10     0.570      70.95    0.68   0.3%     0.7240
+   hybrid estimate, 1 thread: scan + N f32 re-scores at 205.0 ns each (random access ignored)
+     binary-hamming   scan 0.088 ms → N=50: 0.098 ms, N=100: 0.108 ms, N=200: 0.129 ms  (exact f32 scan 1.648 ms)
+     binary           scan 1.977 ms → N=50: 1.987 ms, N=100: 1.997 ms, N=200: 2.018 ms  (exact f32 scan 1.648 ms)
+     pq48             scan 1.640 ms → N=50: 1.650 ms, N=100: 1.661 ms, N=200: 1.681 ms  (exact f32 scan 1.648 ms)
+

@@ -5,15 +5,17 @@
 //! approximate the reference distance on the original f32 vector within the
 //! codec's documented error model.
 
+mod hamming;
 mod mixed;
 mod pq;
 mod truncate;
 
+pub use hamming::HammingCodec;
 pub use mixed::MixedCodec;
 pub use pq::PqCodec;
 pub use truncate::TruncateCodec;
 
-use crate::{Codec, CodecError, Encoded, Metric, Vector, distance};
+use crate::{Codec, CodecError, Encoded, Metric, Vector};
 
 pub(crate) fn check_dim(expected: usize, got: usize) -> Result<(), CodecError> {
     if got == expected {
@@ -73,20 +75,38 @@ impl Codec for F32Codec {
         Ok(Encoded(vector.iter().flat_map(|v| v.to_le_bytes()).collect()))
     }
 
-    fn decode(&self, encoded: &Encoded) -> Result<Vector, CodecError> {
-        check_payload(self.encoded_size(), encoded.0.len())?;
+    fn decode(&self, encoded: &[u8]) -> Result<Vector, CodecError> {
+        check_payload(self.encoded_size(), encoded.len())?;
         Ok(encoded
-            .0
             .chunks_exact(4)
             .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
             .collect())
     }
 
-    fn score(&self, query: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
+    /// Reads the stored floats in place, in one fused pass: nothing is
+    /// allocated per vector. The three running sums accumulate in the same
+    /// order as [`distance::score`], so the result is identical to scoring the
+    /// decoded vector.
+    fn score(&self, query: &[f32], encoded: &[u8], metric: Metric) -> Result<f32, CodecError> {
         check_dim(self.dimension, query.len())?;
-        // Baseline: decoding is the documented behaviour here.
-        let stored = self.decode(encoded)?;
-        Ok(distance::score(query, &stored, metric))
+        check_payload(self.encoded_size(), encoded.len())?;
+        let stored = encoded
+            .chunks_exact(4)
+            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]));
+        Ok(match metric {
+            Metric::Dot => query.iter().zip(stored).map(|(q, x)| q * x).sum(),
+            Metric::Cosine => {
+                let (mut dot, mut qq, mut xx) = (0f32, 0f32, 0f32);
+                for (&q, x) in query.iter().zip(stored) {
+                    dot += q * x;
+                    qq += q * q;
+                    xx += x * x;
+                }
+                let denom = qq.sqrt() * xx.sqrt();
+                if denom == 0.0 { 0.0 } else { dot / denom }
+            }
+            Metric::L2 => query.iter().zip(stored).map(|(q, x)| (q - x) * (q - x)).sum(),
+        })
     }
 }
 
@@ -159,16 +179,16 @@ impl Codec for Int8Codec {
         Ok(Encoded(out))
     }
 
-    fn decode(&self, encoded: &Encoded) -> Result<Vector, CodecError> {
-        check_payload(self.encoded_size(), encoded.0.len())?;
-        let (min, scale, q) = Self::split(&encoded.0);
+    fn decode(&self, encoded: &[u8]) -> Result<Vector, CodecError> {
+        check_payload(self.encoded_size(), encoded.len())?;
+        let (min, scale, q) = Self::split(encoded);
         Ok(q.iter().map(|&b| min + scale * f32::from(b)).collect())
     }
 
-    fn score(&self, query: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
+    fn score(&self, query: &[f32], encoded: &[u8], metric: Metric) -> Result<f32, CodecError> {
         check_dim(self.dimension, query.len())?;
-        check_payload(self.encoded_size(), encoded.0.len())?;
-        let (min, scale, q) = Self::split(&encoded.0);
+        check_payload(self.encoded_size(), encoded.len())?;
+        let (min, scale, q) = Self::split(encoded);
         let (min, scale) = (f64::from(min), f64::from(scale));
 
         // One pass: everything below is derived from these five sums.
@@ -257,27 +277,21 @@ impl Codec for BinaryCodec {
         Ok(Encoded(out))
     }
 
-    fn decode(&self, encoded: &Encoded) -> Result<Vector, CodecError> {
-        check_payload(self.encoded_size(), encoded.0.len())?;
+    fn decode(&self, encoded: &[u8]) -> Result<Vector, CodecError> {
+        check_payload(self.encoded_size(), encoded.len())?;
         let mag = self.inv_sqrt_d() as f32;
         Ok((0..self.dimension)
-            .map(|i| {
-                if encoded.0[i / 8] >> (i % 8) & 1 == 1 {
-                    mag
-                } else {
-                    -mag
-                }
-            })
+            .map(|i| if encoded[i / 8] >> (i % 8) & 1 == 1 { mag } else { -mag })
             .collect())
     }
 
-    fn score(&self, query: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
+    fn score(&self, query: &[f32], encoded: &[u8], metric: Metric) -> Result<f32, CodecError> {
         check_dim(self.dimension, query.len())?;
-        check_payload(self.encoded_size(), encoded.0.len())?;
+        check_payload(self.encoded_size(), encoded.len())?;
         let (mut signed, mut sum_xx) = (0f64, 0f64);
         for (i, &x) in query.iter().enumerate() {
             let x = f64::from(x);
-            let positive = encoded.0[i / 8] >> (i % 8) & 1 == 1;
+            let positive = encoded[i / 8] >> (i % 8) & 1 == 1;
             signed += if positive { x } else { -x };
             sum_xx += x * x;
         }
@@ -474,14 +488,14 @@ impl Codec for BinaryCentredCodec {
         Ok(Encoded(out))
     }
 
-    fn decode(&self, encoded: &Encoded) -> Result<Vector, CodecError> {
-        check_payload(self.encoded_size(), encoded.0.len())?;
+    fn decode(&self, encoded: &[u8]) -> Result<Vector, CodecError> {
+        check_payload(self.encoded_size(), encoded.len())?;
         let c = self.centring()?;
         Ok(c.mean
             .iter()
             .enumerate()
             .map(|(i, &m)| {
-                if encoded.0[i / 8] >> (i % 8) & 1 == 1 {
+                if encoded[i / 8] >> (i % 8) & 1 == 1 {
                     m + c.scale
                 } else {
                     m - c.scale
@@ -490,16 +504,16 @@ impl Codec for BinaryCentredCodec {
             .collect())
     }
 
-    fn score(&self, query: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
+    fn score(&self, query: &[f32], encoded: &[u8], metric: Metric) -> Result<f32, CodecError> {
         check_dim(self.dimension, query.len())?;
-        check_payload(self.encoded_size(), encoded.0.len())?;
+        check_payload(self.encoded_size(), encoded.len())?;
         let c = self.centring()?;
         let alpha = f64::from(c.scale);
         // Running sums over one pass: q·μ, q·s, μ·s and ‖q‖², with s = ±1.
         let (mut dot_qm, mut dot_qs, mut dot_ms, mut sum_qq) = (0f64, 0f64, 0f64, 0f64);
         for (i, (&q, &m)) in query.iter().zip(&c.mean).enumerate() {
             let (q, m) = (f64::from(q), f64::from(m));
-            let positive = encoded.0[i / 8] >> (i % 8) & 1 == 1;
+            let positive = encoded[i / 8] >> (i % 8) & 1 == 1;
             dot_qm += q * m;
             sum_qq += q * q;
             if positive {
@@ -528,6 +542,24 @@ impl Codec for BinaryCentredCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::distance;
+
+    #[test]
+    fn f32_scores_in_place_identically_to_the_reference() {
+        let mut rng = XorShift(31);
+        let c = F32Codec::new(384);
+        for _ in 0..50 {
+            let q = rng.vector(384);
+            let v = rng.vector(384);
+            let e = c.encode(&v).unwrap();
+            for m in [Metric::Dot, Metric::Cosine, Metric::L2] {
+                assert_eq!(c.score(&q, &e, m).unwrap(), distance::score(&q, &v, m), "{m:?}");
+            }
+            // The fused cosine matches the three-pass formula bit for bit.
+            let three_pass = distance::dot(&q, &v) / (distance::norm(&q) * distance::norm(&v));
+            assert_eq!(distance::cosine(&q, &v), three_pass);
+        }
+    }
 
     /// Small deterministic generator so tests need no external crate.
     struct XorShift(u64);

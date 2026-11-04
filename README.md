@@ -99,12 +99,15 @@ limit:
 | Claim | What hvec measures | What that does not show |
 |---|---|---|
 | **Less memory at comparable quality** | Bytes per vector, and nDCG@k and document recall@k against the labels, next to the f32 ceiling | Anything about speed |
-| **Faster search** | Scan time of the compressed-domain score over the whole collection | Not yet claimable: hvec scores every codec asymmetrically against a float query in a brute-force scan, so binary is no faster than int8 here, and nothing in the harness is memory-bandwidth bound. A speed claim needs a symmetric (Hamming, lookup-table) path and a setting where bytes read is the bottleneck |
+| **Faster search** | Scan time per query over the whole collection, in place in a contiguous buffer (`bench scan`), against the machine's memory bandwidth | Only the symmetric `binary-hamming` scan is faster: every asymmetric codec costs about what f32 costs per vector, because its scoring, not its bytes, sets the time. Measured on one machine, brute force, with the hybrid's re-score cost computed rather than timed end to end |
 | **Useful operations directly on the compressed vectors** | Every codec's `score` runs without decoding, and is tested to equal the metric on the decoded vector | Whether the operation is cheap; see the speed row |
 
 Where the published numbers stand on the first claim: `int8` is 4× smaller and indistinguishable
 from f32 against the labels; `pq48` is 32× smaller at two points of nDCG@10; `binary` is 32×
-smaller at 4.4 points. On the second claim hvec makes no claim yet. The useful advantage a new
+smaller at 4.4 points. On the second claim: a `binary-hamming` scan plus an f32 re-score of 369
+candidates reaches 95% recall@10 on FiQA about 19× faster than an exact f32 scan on one thread,
+and is the only compressed path that is faster at all
+([zero-copy scan](experiments/2026-11-zero-copy-scan/)). The useful advantage a new
 codec has to demonstrate is over *those* numbers, on the same corpus, with the byte count stated.
 
 ### 2. Does the loss reach the answer?
@@ -339,6 +342,11 @@ parameters alongside the collection, and reuses them for every later ingest, so 
 call a representative sample of the corpus rather than a single file. `mrl<k>` keeps the first
 `k` dimensions (what Matryoshka-trained models are built for) and composes with any other codec:
 `mrl256+int8`, `mrl128+pq16`.
+`binary-hamming` stores the same bits as `binary` but binarises the query too and scores by XOR
+and popcount: coarser, and about 20× faster to scan. `mixed<B>` is trained: it spends a fixed
+`B` bytes per vector with bits allocated per
+dimension by variance. `mixed<B>-pca` rotates into the corpus's principal components first, and
+`-w` weights each component by how much energy queries put into it (see below).
 
 With a question set that carries relevance judgments, `bench recall --questions` also reports
 nDCG@k and document recall@k against the labels, for every codec and for the f32 ceiling:
@@ -373,8 +381,67 @@ recovers only four or five points of recall: one bit per dimension cannot separa
 whose cosines differ by less than its resolution, whatever the origin is. Against the human
 relevance judgments the picture is gentler: binary loses 4.4 points of nDCG@10 (0.698 to 0.654),
 not 39, because the neighbours it reorders are near-ties that are rarely the judged abstract.
-The f32 scan is slow only because the baseline decodes each vector; the other codecs score the
-bytes directly. The experiments are written up under [`experiments/`](experiments/).
+The scan times in that table predate the in-place f32 kernel, when f32 decoded every vector into
+a new allocation. `bench scan` is now the place to time scans: it scores every codec in place in
+a contiguous buffer and reports GB/s against the machine's memory bandwidth
+([zero-copy scan](experiments/2026-11-zero-copy-scan/)). The experiments are written up under
+[`experiments/`](experiments/).
+
+#### Hybrid and adaptive quantization
+
+A small code scanned over every vector loses neighbours, and how many it loses is predictable:
+it is set by the code's score noise divided by how tightly the corpus packs a query's
+neighbours (the [neighbour-spacing experiment](experiments/2026-11-neighbour-spacing/)). There
+are two ways to win the loss back.
+
+**Hybrid.** Keep the small code in memory for the scan, shortlist its best N candidates, and
+re-score only those with int8 or f32 vectors fetched from disk:
+
+<p align="center">
+  <img src="docs/assets/animations/hybrid-rescoring.svg" width="820" alt="Animated schematic of two-stage retrieval: every vector is scored from a 48-byte code; the code's top 10 keeps 6 of the 10 true neighbours; the code's top 30 are re-scored with exact f32 vectors, lifting 9 of the 10 true neighbours into the top 10, while one ranked 31st by the code falls outside the shortlist and is missed.">
+</p>
+
+```sh
+hvec bench rescore --collection scifact --questions questions/scifact.jsonl \
+  --codecs binary,pq48 --rescore int8,f32 --depths 20,50,100
+```
+
+Across ten collections (five corpora, two embedding models), re-scoring 50 f32 candidates
+behind a 48-byte scan recovers 0.95 (`binary`) to 0.99 (`pq48`) of the exact top 10 and
+essentially all of the nDCG loss. That costs 3–4% of the bytes a full f32 scan reads. The depth
+needed follows the same noise-to-spacing ratio (Spearman ρ ≈ 0.93), so one f32 pass over a
+corpus tells you how deep to go:
+[two-stage re-scoring](experiments/2026-11-two-stage-rescoring/).
+
+**Adaptive depth.** A fixed N is too deep for some queries and too shallow for others. The
+`--margins` policy re-scores every candidate whose code score is within λσ of the code's own
+10th score, where σ is the code's noise, calibrated once per collection on self-queries:
+
+<p align="center">
+  <img src="docs/assets/animations/adaptive-depth.svg" width="820" alt="Animated schematic of adaptive re-scoring depth: two queries share the same noise-based margin below their 10th code score; a crowded query has 59 candidates inside the margin and a well-separated query 18, while a fixed shortlist of 30 would under-fetch for the first and over-fetch for the second.">
+</p>
+
+Measured exactly at the same mean depth, the margin policy adds only 0.3 to 0.6 points of
+recall@10 over a fixed depth, but up to 4 points for the worst decile of queries. A hindsight
+oracle shows about 6 points of headroom, almost none of which is visible from the scan's own
+scores ([routing experiment](experiments/2026-11-routing-oracle/)).
+
+**Adaptive bits.** Spend the scan code's bytes unevenly, where they buy the most. This is the
+idea behind mixed-precision quantization of mixture-of-experts models, where blocks and experts
+that matter more get more bits ([QuantMoE-Bench](https://github.com/UNITES-Lab/moe-quantization)).
+For embeddings, "matters more" means a principal component with more variance, or with more of
+the query's energy:
+
+<p align="center">
+  <img src="docs/assets/animations/adaptive-bits.svg" width="820" alt="Animated bar chart of how a 48-byte budget is spread over 384 principal components of SciFact's bge-small embeddings: uniform binary gives every component 1 bit (recall@10 0.611); variance-based allocation concentrates bits on the leading components and gives 97 none (0.694); query-weighted allocation gives 158 none and returns a few bits to the last components, which carry 28% of the corpus mean (0.703).">
+</p>
+
+On SciFact at 48 bytes with no re-scoring, `mixed48-pca-w` keeps 0.703 of the top 10, against
+0.611 for `binary` and 0.711 for `pq48`. The full comparison, every scan codec against every
+re-score policy, is the [hybrid × adaptive matrix](experiments/2026-11-hybrid-adaptive-matrix/).
+The animations are generated by
+[`docs/assets/animations/make_animations.py`](docs/assets/animations/make_animations.py); the
+bit-allocation chart uses SciFact's real PCA spectrum and allocations.
 
 ### 7. Run the matrix and report
 

@@ -6,6 +6,7 @@ pub mod list;
 pub mod memory;
 pub mod query;
 pub mod questions;
+pub mod scan;
 pub mod shell;
 
 /// Shared retrieve-then-answer step used by `query` and `chat`.

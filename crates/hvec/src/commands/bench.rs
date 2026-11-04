@@ -24,6 +24,7 @@ pub async fn run(config: &Option<PathBuf>, cmd: BenchCommand) -> Result<()> {
         BenchCommand::Rescore(args) => rescore_cmd(config, args).await,
         BenchCommand::Run(args) => run_cmd(config, args).await,
         BenchCommand::Memory(args) => crate::commands::memory::run(config, args).await,
+        BenchCommand::Scan(args) => crate::commands::scan::run(config, &args),
     }
 }
 
@@ -546,6 +547,16 @@ async fn rescore_cmd(config: &Option<PathBuf>, args: RescoreArgs) -> Result<()> 
     // queries' exact scores never inform their own depth.
     let calibration = recall::self_queries(&ids, &vectors, args.calibration_sample);
 
+    // Margin grid for per-query traces: fine enough to trace the adaptive
+    // policy's whole recall-against-depth curve offline.
+    let trace_margins: Vec<f64> = (1..=24).map(|i| f64::from(i) * 0.25).collect();
+    let mut trace_out = match &args.trace {
+        Some(path) => Some(std::io::BufWriter::new(
+            std::fs::File::create(path).with_context(|| format!("creating {}", path.display()))?,
+        )),
+        None => None,
+    };
+
     let mut profiles = Vec::new();
     let mut cells = Vec::new();
     for name in &args.codecs {
@@ -566,8 +577,13 @@ async fn rescore_cmd(config: &Option<PathBuf>, args: RescoreArgs) -> Result<()> 
             margins: &args.margins,
             noise,
             max_depth: args.max_depth,
+            trace_margins: if args.trace.is_some() { &trace_margins } else { &[] },
         };
-        let (profile, reports) = rescore::evaluate(
+        let rescore::Evaluation {
+            profile,
+            reports,
+            traces,
+        } = rescore::evaluate(
             &ids,
             &vectors,
             &queries,
@@ -599,6 +615,23 @@ async fn rescore_cmd(config: &Option<PathBuf>, args: RescoreArgs) -> Result<()> 
                 row.metrics = serde_json::to_value(r)?;
                 store.insert_run(&row)?;
             }
+        }
+        if let Some(out) = trace_out.as_mut() {
+            use std::io::Write as _;
+            let line = serde_json::json!({
+                "collection": collection.name,
+                "first": profile.first,
+                "first_bytes": profile.first_bytes,
+                "vectors": vectors.len(),
+                "k": args.k,
+                "calibrated_noise": noise,
+                "trace_margins": trace_margins,
+                "ranks": traces.iter().map(|t| &t.ranks).collect::<Vec<_>>(),
+                "band": traces.iter().map(|t| t.band).collect::<Vec<_>>(),
+                "band_hat": traces.iter().map(|t| t.band_hat).collect::<Vec<_>>(),
+                "margin_depths": traces.iter().map(|t| &t.margin_depths).collect::<Vec<_>>(),
+            });
+            writeln!(out, "{line}")?;
         }
         profiles.push(profile);
         cells.extend(reports);

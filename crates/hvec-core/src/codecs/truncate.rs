@@ -110,13 +110,13 @@ impl Codec for TruncateCodec {
         self.inner.encode(self.prefix(vector)?)
     }
 
-    fn decode(&self, encoded: &Encoded) -> Result<Vector, CodecError> {
+    fn decode(&self, encoded: &[u8]) -> Result<Vector, CodecError> {
         let mut v = self.inner.decode(encoded)?;
         v.resize(self.dimension, 0.0);
         Ok(v)
     }
 
-    fn score(&self, query: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
+    fn score(&self, query: &[f32], encoded: &[u8], metric: Metric) -> Result<f32, CodecError> {
         self.inner.score(self.prefix(query)?, encoded, metric)
     }
 
@@ -126,7 +126,7 @@ impl Codec for TruncateCodec {
         self.inner.prepare_query(self.prefix(query)?)
     }
 
-    fn score_prepared(&self, prepared: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
+    fn score_prepared(&self, prepared: &[f32], encoded: &[u8], metric: Metric) -> Result<f32, CodecError> {
         self.inner.score_prepared(prepared, encoded, metric)
     }
 }
