@@ -12,6 +12,7 @@ pub mod questions;
 pub mod recall;
 pub mod record;
 pub mod report;
+pub mod rescore;
 
 pub use chunk::{ChunkOptions, chunk_text};
 pub use judge::{JUDGE_PROMPT_VERSION, JUDGE_SYSTEM_PROMPT, Verdict, build_judge_prompt, parse_verdict};

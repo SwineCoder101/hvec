@@ -155,6 +155,8 @@ pub struct ImportBeirArgs {
 pub enum BenchCommand {
     /// Re-encode an f32 collection with other codecs and measure retrieval against the exact ranking.
     Recall(RecallArgs),
+    /// Two-stage retrieval: scan with a small code, re-score the top candidates with a larger one.
+    Rescore(RescoreArgs),
     /// Run a question set across collections and chat profiles, scoring every answer.
     Run(BenchRunArgs),
     /// Replay an agent memory script (writes and asks) once per codec, measuring every step.
@@ -308,6 +310,50 @@ pub struct RecallArgs {
     #[arg(long)]
     pub no_record: bool,
     /// Print the reports as JSON instead of a table.
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct RescoreArgs {
+    /// An f32 collection to use as ground truth.
+    #[arg(short, long)]
+    pub collection: String,
+    /// First-stage codecs, scanned over every vector. Trained codecs are fitted on the collection first.
+    #[arg(long, value_delimiter = ',', default_value = "binary,pq48")]
+    pub codecs: Vec<String>,
+    /// Second-stage representations, applied to the candidates only.
+    #[arg(long, value_delimiter = ',', default_value = "int8,f32")]
+    pub rescore: Vec<String>,
+    /// Candidate depths to re-score. Values below k are raised to k.
+    #[arg(long, value_delimiter = ',', default_value = "10,20,30,50,100,200,500")]
+    pub depths: Vec<usize>,
+    /// Adaptive policy: re-score every candidate within this many noise units of the
+    /// first stage's k-th score. Noise is calibrated on self-queries, never on the test queries.
+    #[arg(long, value_delimiter = ',', default_value = "1,2,3")]
+    pub margins: Vec<f64>,
+    /// Cap on any query's candidate depth.
+    #[arg(long, default_value_t = 1000)]
+    pub max_depth: usize,
+    /// Self-queries used to calibrate the first stage's noise for the adaptive policy.
+    #[arg(long, default_value_t = 200)]
+    pub calibration_sample: usize,
+    /// Neighbours per query.
+    #[arg(short, long, default_value_t = 10)]
+    pub k: usize,
+    /// How many stored vectors to use as self-queries (each excludes itself).
+    #[arg(long, default_value_t = 100)]
+    pub sample: usize,
+    /// A text file with one query per line, instead of self-queries.
+    #[arg(long, conflicts_with = "questions")]
+    pub queries: Option<PathBuf>,
+    /// A JSONL question set; questions with `relevant` judgments also yield nDCG@k and document recall@k.
+    #[arg(long)]
+    pub questions: Option<PathBuf>,
+    /// Do not write the results to the run log.
+    #[arg(long)]
+    pub no_record: bool,
+    /// Print the results as JSON instead of tables.
     #[arg(long)]
     pub json: bool,
 }

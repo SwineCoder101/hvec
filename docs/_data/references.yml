@@ -20,6 +20,38 @@
   year: 2014
   url: https://doi.org/10.1109/TPAMI.2013.240
   note: Learns a rotation before splitting into subspaces, cutting PQ error substantially. The usual next step after plain PQ.
+- key: max1960quantizing
+  topic: Quantization
+  authors: Joel Max
+  title: Quantizing for Minimum Distortion
+  venue: IRE Transactions on Information Theory 6(1)
+  year: 1960
+  url: https://doi.org/10.1109/TIT.1960.1057548
+  note: Optimal scalar quantizers for a Gaussian source. The step sizes `mixed<B>` uses per dimension.
+- key: huang1963block
+  topic: Quantization
+  authors: J. J. Y. Huang, P. M. Schultheiss
+  title: Block Quantization of Correlated Gaussian Random Variables
+  venue: IEEE Transactions on Communications Systems 11(3)
+  year: 1963
+  url: https://doi.org/10.1109/TCOM.1963.1088759
+  note: Transform coding. Decorrelate (here, PCA), then allocate bits across components by variance. The design of `mixed<B>-pca`.
+- key: li2024quantmoe
+  topic: Quantization
+  authors: Pingzhi Li, Xiaolong Jin, Yu Cheng, Tianlong Chen
+  title: "QuantMoE-Bench: Examining Post-Training Quantization for Mixture-of-Experts"
+  venue: arXiv:2406.08155
+  year: 2024
+  url: https://arxiv.org/abs/2406.08155
+  note: "Structure-aware mixed-precision post-training quantization of MoE models: different blocks, experts and linear layers need different bit widths, chosen by importance scorers such as a linear-weight outlier score. Code: github.com/UNITES-Lab/moe-quantization. The model for hvec's adaptive bit allocation."
+- key: li2025submoe
+  topic: Quantization
+  authors: Lujun Li, Zhu Qiyuan, Jiacheng Wang, Wei Li, Hao Gu, Sirui Han, Yike Guo
+  title: "Sub-MoE: Efficient Mixture-of-Expert LLMs Compression via Subspace Expert Merging"
+  venue: arXiv:2506.23266
+  year: 2025
+  url: https://arxiv.org/abs/2506.23266
+  note: "Clusters experts by cosine similarity, takes a joint SVD of each group's weights and merges the V matrices weighted by expert frequency. Code: github.com/siruihan2024/Sub-MoE. Suggests per-cluster subspaces for embedding codecs."
 - key: babenko2014aq
   topic: Quantization
   authors: Artem Babenko, Victor Lempitsky
@@ -210,6 +242,46 @@
   year: 2021
   url: https://arxiv.org/abs/2104.08663
   note: Retrieval datasets with relevance judgments. A likely source for hvec's question sets.
+- key: boteva2016nfcorpus
+  topic: Embeddings and RAG
+  authors: Vera Boteva, Demian Gholipour, Artem Sokolov, Stefan Riezler
+  title: A Full-Text Learning to Rank Dataset for Medical Information Retrieval
+  venue: European Conference on Information Retrieval (ECIR)
+  year: 2016
+  url: https://doi.org/10.1007/978-3-319-30671-1_58
+  note: NFCorpus, the medical corpus in BEIR. Used in the neighbour-spacing experiment.
+- key: wachsmuth2018arguana
+  topic: Embeddings and RAG
+  authors: Henning Wachsmuth, Shahbaz Syed, Benno Stein
+  title: Retrieval of the Best Counterargument without Prior Topic Knowledge
+  venue: Annual Meeting of the Association for Computational Linguistics (ACL)
+  year: 2018
+  url: https://aclanthology.org/P18-1023/
+  note: ArguAna, argument-to-counterargument retrieval in BEIR. Used in the neighbour-spacing experiment.
+- key: maia2018fiqa
+  topic: Embeddings and RAG
+  authors: Macedo Maia, Siegfried Handschuh, André Freitas, Brian Davis, Ross McDermott, Manel Zarrouk, Alexandra Balahur
+  title: "WWW'18 Open Challenge: Financial Opinion Mining and Question Answering"
+  venue: Companion Proceedings of The Web Conference
+  year: 2018
+  url: https://doi.org/10.1145/3184558.3192301
+  note: FiQA, financial question answering in BEIR. Used in the neighbour-spacing experiment.
+- key: huang2021cosqa
+  topic: Embeddings and RAG
+  authors: Junjie Huang, Duyu Tang, Linjun Shou, Ming Gong, Ke Xu, Daxin Jiang, Ming Zhou, Nan Duan
+  title: "CoSQA: 20,000+ Web Queries for Code Search and Question Answering"
+  venue: Annual Meeting of the Association for Computational Linguistics (ACL)
+  year: 2021
+  url: https://arxiv.org/abs/2105.13239
+  note: Web queries paired with Python functions. Used, via CoIR, in the neighbour-spacing experiment.
+- key: li2024coir
+  topic: Embeddings and RAG
+  authors: Xiangyang Li, Kuicai Dong, Yi Quan Lee, Wei Xia, Hao Zhang, Xinyi Dai, Yasheng Wang, Ruiming Tang
+  title: "CoIR: A Comprehensive Benchmark for Code Information Retrieval Models"
+  venue: arXiv:2407.02883
+  year: 2024
+  url: https://arxiv.org/abs/2407.02883
+  note: Code retrieval datasets in BEIR's layout. The source of hvec's CoSQA copy.
 
 - key: morris2023vec2text
   topic: Embeddings and RAG

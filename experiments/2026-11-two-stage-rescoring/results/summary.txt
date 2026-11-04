@@ -1,0 +1,140 @@
+Depth an exact (f32) re-score needs, as a multiple of k
+collection           first           bytes noise/band recall@k    90%    95%    99% median full
+arguana-bge-small    binary             48      0.786   0.7482    1.8    2.8    6.2         1.9
+arguana-bge-small    binary-centred     48      0.788   0.7726    1.6    2.2    4.5         1.7
+arguana-bge-small    pq96               96      0.289   0.9031    1.0    1.2    1.6         1.1
+arguana-bge-small    pq48               48      0.681   0.8110    1.4    1.7    3.2         1.5
+arguana-bge-small    pq24               24      1.198   0.7121    2.0    3.2    7.2         2.2
+arguana-minilm       binary             48      0.513   0.8148    1.3    1.7    2.8         1.4
+arguana-minilm       binary-centred     48      0.511   0.8240    1.3    1.6    2.7         1.4
+arguana-minilm       pq96               96      0.202   0.9241    1.0    1.1    1.4         1.1
+arguana-minilm       pq48               48      0.486   0.8486    1.2    1.5    2.3         1.3
+arguana-minilm       pq24               24      0.930   0.7434    1.7    2.4    4.9         1.8
+cosqa-bge-small      binary             48      0.957   0.6598    3.1    4.7   13.2         1.8
+cosqa-bge-small      binary-centred     48      0.695   0.7252    2.5    4.2    8.9         1.5
+cosqa-bge-small      pq96               96      0.326   0.8776    1.2    1.6    2.7         1.0
+cosqa-bge-small      pq48               48      0.615   0.7728    2.0    2.8    6.8         1.3
+cosqa-bge-small      pq24               24      0.949   0.6734    3.8    6.9   19.0         2.3
+cosqa-minilm         binary             48      0.751   0.7190    2.4    3.6    8.0         1.5
+cosqa-minilm         binary-centred     48      0.714   0.7246    2.2    3.4    7.9         1.5
+cosqa-minilm         pq96               96      0.315   0.8970    1.1    1.6    2.6         1.0
+cosqa-minilm         pq48               48      0.649   0.7750    2.1    2.8    5.1         1.4
+cosqa-minilm         pq24               24      1.016   0.6400    3.4    5.8   14.6         2.1
+fiqa-bge-small       binary             48      1.645   0.5367    6.0   10.5   32.7         6.7
+fiqa-bge-small       binary-centred     48      1.067   0.6002    3.9    5.8   14.3         4.2
+fiqa-bge-small       pq96               96      0.528   0.8165    1.3    1.6    2.5         1.5
+fiqa-bge-small       pq48               48      0.978   0.6418    2.9    4.4    8.8         3.4
+fiqa-bge-small       pq24               24      1.345   0.4454    9.8   16.5   45.3        11.0
+fiqa-minilm          binary             48      0.927   0.6656    2.6    3.8    8.6         3.0
+fiqa-minilm          binary-centred     48      0.881   0.6826    2.4    3.6    7.3         2.8
+fiqa-minilm          pq96               96      0.433   0.8568    1.2    1.4    2.2         1.3
+fiqa-minilm          pq48               48      0.811   0.7162    2.0    2.9    5.6         2.3
+fiqa-minilm          pq24               24      1.241   0.5069    6.0    9.9   25.0         6.7
+nfcorpus-bge-small   binary             48      1.654   0.5560    6.4   11.6   42.4         5.8
+nfcorpus-bge-small   binary-centred     48      1.113   0.5827    4.6    7.4   17.0         4.2
+nfcorpus-bge-small   pq96               96      0.498   0.8350    1.3    1.6    2.5         1.4
+nfcorpus-bge-small   pq48               48      0.907   0.6842    2.5    3.7    8.6         2.5
+nfcorpus-bge-small   pq24               24      1.247   0.5294    6.3   10.6   31.5         6.2
+nfcorpus-minilm      binary             48      0.943   0.6690    2.8    4.3   10.0         3.1
+nfcorpus-minilm      binary-centred     48      0.874   0.6907    2.5    4.0    9.1         2.7
+nfcorpus-minilm      pq96               96      0.378   0.8743    1.1    1.3    2.0         1.2
+nfcorpus-minilm      pq48               48      0.734   0.7424    1.8    2.5    4.6         1.9
+nfcorpus-minilm      pq24               24      1.140   0.5944    3.6    5.9   13.6         3.9
+scifact-bge-small    binary             48      1.390   0.6110    4.0    7.1   19.2         4.5
+scifact-bge-small    binary-centred     48      0.972   0.6560    3.0    4.5    9.0         3.3
+scifact-bge-small    pq96               96      0.442   0.8447    1.2    1.5    2.2         1.3
+scifact-bge-small    pq48               48      0.831   0.7113    2.1    3.1    5.9         2.3
+scifact-bge-small    pq24               24      1.219   0.5767    4.5    7.1   18.3         5.0
+scifact-minilm       binary             48      0.902   0.7050    2.4    3.6    8.5         2.6
+scifact-minilm       binary-centred     48      0.860   0.7187    2.1    3.1    6.0         2.3
+scifact-minilm       pq96               96      0.381   0.8747    1.1    1.3    1.9         1.2
+scifact-minilm       pq48               48      0.747   0.7640    1.7    2.2    4.5         1.8
+scifact-minilm       pq24               24      1.168   0.6363    3.6    5.8   16.8         3.7
+
+50 (collection, first stage) points
+recall 90%: depth/k = 3.07 × (noise/band)^1.06;  spearman 0.930;  held-out corpus error: a factor of 1.25 on average
+recall 95%: depth/k = 4.76 × (noise/band)^1.29;  spearman 0.934;  held-out corpus error: a factor of 1.31 on average
+recall 99%: depth/k = 11.22 × (noise/band)^1.74;  spearman 0.925;  held-out corpus error: a factor of 1.41 on average
+
+Recall@k and nDCG@k by cell (mean over collections), and the best first stage per byte
+first           second  depth  recall@k ndcg loss vs f32
+binary          f32        10    0.6685           0.0138
+binary          f32        20    0.8405           0.0035
+binary          f32        30    0.8999           0.0017
+binary          f32        50    0.9482           0.0003
+binary          f32       100    0.9808          -0.0001
+binary          f32       200    0.9930           0.0001
+binary          f32       500    0.9985          -0.0000
+binary          f32      1000    0.9998           0.0000
+binary          int8       10    0.6685           0.0138
+binary          int8       20    0.8392           0.0033
+binary          int8       30    0.8976           0.0017
+binary          int8       50    0.9439           0.0004
+binary          int8      100    0.9739          -0.0001
+binary          int8      200    0.9847           0.0001
+binary          int8      500    0.9894           0.0001
+binary          int8     1000    0.9905           0.0001
+binary-centred  f32        10    0.6977           0.0125
+binary-centred  f32        20    0.8691           0.0026
+binary-centred  f32        30    0.9239           0.0014
+binary-centred  f32        50    0.9662           0.0002
+binary-centred  f32       100    0.9910           0.0000
+binary-centred  f32       200    0.9981           0.0000
+binary-centred  f32       500    0.9999           0.0000
+binary-centred  f32      1000    1.0000           0.0000
+binary-centred  int8       10    0.6977           0.0124
+binary-centred  int8       20    0.8672           0.0024
+binary-centred  int8       30    0.9202           0.0013
+binary-centred  int8       50    0.9605           0.0002
+binary-centred  int8      100    0.9830           0.0000
+binary-centred  int8      200    0.9890           0.0001
+binary-centred  int8      500    0.9905           0.0001
+binary-centred  int8     1000    0.9906           0.0001
+pq24            f32        10    0.6058           0.0309
+pq24            f32        20    0.7791           0.0119
+pq24            f32        30    0.8551           0.0075
+pq24            f32        50    0.9182           0.0046
+pq24            f32       100    0.9680           0.0020
+pq24            f32       200    0.9896           0.0003
+pq24            f32       500    0.9980           0.0001
+pq24            f32      1000    0.9996           0.0001
+pq24            int8       10    0.6058           0.0311
+pq24            int8       20    0.7781           0.0119
+pq24            int8       30    0.8529           0.0076
+pq24            int8       50    0.9146           0.0048
+pq24            int8      100    0.9620           0.0020
+pq24            int8      200    0.9819           0.0004
+pq24            int8      500    0.9889           0.0001
+pq24            int8     1000    0.9902           0.0002
+pq48            f32        10    0.7467           0.0078
+pq48            f32        20    0.9125           0.0019
+pq48            f32        30    0.9588           0.0006
+pq48            f32        50    0.9863           0.0002
+pq48            f32       100    0.9977          -0.0001
+pq48            f32       200    0.9997           0.0000
+pq48            f32       500    1.0000           0.0000
+pq48            f32      1000    1.0000           0.0000
+pq48            int8       10    0.7467           0.0078
+pq48            int8       20    0.9098           0.0019
+pq48            int8       30    0.9539           0.0006
+pq48            int8       50    0.9788           0.0002
+pq48            int8      100    0.9888          -0.0000
+pq48            int8      200    0.9903           0.0001
+pq48            int8      500    0.9905           0.0001
+pq48            int8     1000    0.9905           0.0001
+pq96            f32        10    0.8704           0.0005
+pq96            f32        20    0.9864          -0.0001
+pq96            f32        30    0.9973          -0.0001
+pq96            f32        50    0.9997          -0.0001
+pq96            f32       100    0.9999           0.0000
+pq96            f32       200    1.0000           0.0000
+pq96            f32       500    1.0000           0.0000
+pq96            f32      1000    1.0000           0.0000
+pq96            int8       10    0.8704           0.0005
+pq96            int8       20    0.9791          -0.0002
+pq96            int8       30    0.9882          -0.0000
+pq96            int8       50    0.9903          -0.0000
+pq96            int8      100    0.9905           0.0001
+pq96            int8      200    0.9905           0.0001
+pq96            int8      500    0.9905           0.0001
+pq96            int8     1000    0.9905           0.0001

@@ -127,6 +127,35 @@ rotation is a `d × d` matrix fitted on the corpus.
 Exit: Experiment 4 published, and a stated answer to whether rotation makes binary usable on
 this embedding model.
 
+## Ideas from MoE compression
+
+Weight compression for Mixture-of-Experts models is working on a problem shaped like this one:
+many similar objects (experts, vectors) sharing structure, where some matter more than others.
+Three lines of work, and what each would mean as an hvec codec or experiment:
+
+- **MoE post-training quantization** (QuantMoE-Bench, UNITES-Lab; arXiv:2406.08155,
+  [code](https://github.com/UNITES-Lab/moe-quantization)). Fine-grained, structure-aware mixed
+  precision: blocks, experts and linear layers get different bit widths, chosen by importance
+  scorers (expert usage frequency, a linear-weight outlier score) tuned to MoE's sparse
+  activation. *In hvec:* `mixed<B>` allocates a byte budget's bits per dimension by variance,
+  and `-w` weights that variance by how much energy queries put into the dimension, the analogue
+  of weighting an expert by how often it is routed to. The per-vector analogue of an outlier
+  scorer, giving more bits to vectors in crowded neighbourhoods, is not built yet.
+- **MoE-SVD** (citation not yet verified; we have only the description so far). Training-free:
+  SVD decomposes each expert's weights into low-rank factors, the V matrices are shared across
+  experts, and the U matrices are trimmed to their top-k columns. *In hvec:* PCA is the SVD of
+  the centred corpus. `mixed<B>-pca` with zero bits on the trailing components is a low-rank
+  codec, and its single rotation per collection is the shared V. Top-k U trimming corresponds to
+  truncating components, which is `mrl<k>` applied after the rotation instead of on raw
+  dimensions.
+- **Sub-MoE, subspace expert merging** (arXiv:2506.23266,
+  [code](https://github.com/siruihan2024/Sub-MoE)). Experts are clustered by cosine similarity,
+  each group gets a joint SVD, and the V matrices are merged by expert frequency to resolve
+  parameter conflicts. *In hvec:* one PCA per k-means cluster instead of one per collection
+  (closest to locally optimised PQ), with each cluster's bit allocation weighted by how often
+  queries land in it. This is the natural next codec if `mixed<B>-pca` beats `pq<m>` at equal
+  bytes.
+
 ## Next
 
 - Run Experiments 1 and 3 and the judge re-scoring as soon as two chat models are reachable;
@@ -134,6 +163,10 @@ this embedding model.
 - Codec follow-ups the write-ups flagged: a per-vector scale for `binary-centred`, and a
   rescoring stage (fetch 5-10× candidates by codec, re-rank with int8 or f32).
 - A second corpus with graded, denser judgments than SciFact's.
+- Done 2026-11-04: neighbour spacing across five corpora (`experiments/2026-11-neighbour-spacing`).
+  Codec noise ÷ neighbour band predicts recall@10 loss (ρ = 0.98). Follow-ups: rescoring depth
+  as a function of that ratio, a deduplicated code corpus, and FiQA subsampled to separate
+  corpus size from spacing.
 
 ## Always
 

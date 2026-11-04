@@ -64,16 +64,24 @@ fn corpus() -> Vec<Vec<f32>> {
 /// Every codec family, fitted on the corpus where the codec needs it, exactly
 /// as `hvec ingest --codec` and `hvec bench recall` do.
 fn codecs(vectors: &[Vec<f32>]) -> Vec<Box<dyn Codec>> {
-    ["f32", "int8", "mrl32+int8", "pq8", "binary-centred", "binary"]
-        .iter()
-        .map(|name| {
-            let mut c = codec_by_name(name, DIM).expect(name);
-            if c.needs_fit() {
-                c.fit(vectors).expect(name);
-            }
-            c
-        })
-        .collect()
+    [
+        "f32",
+        "int8",
+        "mrl32+int8",
+        "pq8",
+        "mixed8-pca-w",
+        "binary-centred",
+        "binary",
+    ]
+    .iter()
+    .map(|name| {
+        let mut c = codec_by_name(name, DIM).expect(name);
+        if c.needs_fit() {
+            c.fit(vectors).expect(name);
+        }
+        c
+    })
+    .collect()
 }
 
 #[test]

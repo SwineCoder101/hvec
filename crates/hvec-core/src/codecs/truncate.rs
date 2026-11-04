@@ -119,6 +119,16 @@ impl Codec for TruncateCodec {
     fn score(&self, query: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
         self.inner.score(self.prefix(query)?, encoded, metric)
     }
+
+    /// The prepared query lives in the inner codec's space: the prefix,
+    /// then whatever the inner codec does to it.
+    fn prepare_query(&self, query: &[f32]) -> Result<Vector, CodecError> {
+        self.inner.prepare_query(self.prefix(query)?)
+    }
+
+    fn score_prepared(&self, prepared: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
+        self.inner.score_prepared(prepared, encoded, metric)
+    }
 }
 
 #[cfg(test)]

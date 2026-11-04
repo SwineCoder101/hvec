@@ -53,16 +53,64 @@ pub struct RecallReport {
     pub ndcg_at_k: Option<f64>,
     /// Mean fraction of relevant documents among the codec's top-k.
     pub doc_recall_at_k: Option<f64>,
+    /// Median over queries of the exact score gap between rank k and rank
+    /// k + 1: how far the last true neighbour sits above the first outsider.
+    /// A property of the corpus and embedding model; the same for every codec.
+    #[serde(default)]
+    pub boundary_gap: f64,
+    /// Median over queries of the exact score gap between rank k and rank
+    /// 2k: the width of the score window holding the next k competitors.
+    /// Codec-independent, like `boundary_gap`.
+    #[serde(default)]
+    pub neighbour_band: f64,
+    /// Mean over queries of the standard deviation of the codec's score error
+    /// over the exact top-2k. Per-query bias is removed, since a constant
+    /// shift does not change a ranking: this is the noise that reorders.
+    #[serde(default)]
+    pub rank_noise: f64,
+}
+
+/// Indices into `scores`, best first, ties broken by id.
+pub(crate) fn ranked(scores: &[(i64, f32)], metric: Metric) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..scores.len()).collect();
+    let by_id = |a: usize, b: usize| scores[a].0.cmp(&scores[b].0);
+    if metric.higher_is_better() {
+        order.sort_by(|&a, &b| scores[b].1.total_cmp(&scores[a].1).then(by_id(a, b)));
+    } else {
+        order.sort_by(|&a, &b| scores[a].1.total_cmp(&scores[b].1).then(by_id(a, b)));
+    }
+    order
 }
 
 fn top_k(scores: &[(i64, f32)], k: usize, metric: Metric) -> Vec<i64> {
-    let mut v: Vec<(i64, f32)> = scores.to_vec();
-    if metric.higher_is_better() {
-        v.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
-    } else {
-        v.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
+    ranked(scores, metric)
+        .into_iter()
+        .take(k)
+        .map(|i| scores[i].0)
+        .collect()
+}
+
+pub(crate) fn median(mut v: Vec<f64>) -> f64 {
+    if v.is_empty() {
+        return 0.0;
     }
-    v.into_iter().take(k).map(|(id, _)| id).collect()
+    v.sort_by(f64::total_cmp);
+    let m = v.len() / 2;
+    if v.len() % 2 == 1 {
+        v[m]
+    } else {
+        (v[m - 1] + v[m]) / 2.0
+    }
+}
+
+/// Standard deviation of `approx − exact` over the given indices.
+pub(crate) fn centred_noise(exact: &[(i64, f32)], approx: &[(i64, f32)], idx: &[usize]) -> f64 {
+    if idx.len() < 2 {
+        return 0.0;
+    }
+    let errs: Vec<f64> = idx.iter().map(|&i| f64::from(approx[i].1 - exact[i].1)).collect();
+    let mean = errs.iter().sum::<f64>() / errs.len() as f64;
+    (errs.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / errs.len() as f64).sqrt()
 }
 
 /// Evaluate `codec` on `(id, f32 vector)` pairs with the given queries.
@@ -101,6 +149,9 @@ pub fn evaluate(
     let mut labelled = 0usize;
     let mut ndcg_sum = 0f64;
     let mut doc_recall_sum = 0f64;
+    let mut boundary_gaps: Vec<f64> = Vec::with_capacity(queries.len());
+    let mut bands: Vec<f64> = Vec::with_capacity(queries.len());
+    let mut noise_sum = 0f64;
 
     for q in queries {
         let t = Instant::now();
@@ -113,11 +164,12 @@ pub fn evaluate(
         baseline_scan_ms += t.elapsed().as_millis() as u64;
 
         let t = Instant::now();
+        let prepared = codec.prepare_query(&q.vector)?;
         let approx: Vec<(i64, f32)> = ids
             .iter()
             .zip(&encoded)
             .filter(|(id, _)| Some(**id) != q.exclude)
-            .map(|(id, e)| codec.score(&q.vector, e, metric).map(|s| (*id, s)))
+            .map(|(id, e)| codec.score_prepared(&prepared, e, metric).map(|s| (*id, s)))
             .collect::<Result<_, _>>()?;
         scan_ms += t.elapsed().as_millis() as u64;
 
@@ -127,7 +179,17 @@ pub fn evaluate(
             err_max = err_max.max(e);
             pairs += 1;
         }
-        let truth = top_k(&exact, k, metric);
+        // `exact` and `approx` are index-aligned: both walk `ids` in order.
+        let order = ranked(&exact, metric);
+        let at = |rank: usize| order.get(rank - 1).map(|&i| f64::from(exact[i].1));
+        if let (Some(sk), Some(sk1)) = (at(k), at(k + 1)) {
+            boundary_gaps.push((sk - sk1).abs());
+        }
+        if let (Some(sk), Some(s2k)) = (at(k), at(2 * k)) {
+            bands.push((sk - s2k).abs());
+        }
+        noise_sum += centred_noise(&exact, &approx, &order[..order.len().min(2 * k)]);
+        let truth: Vec<i64> = order.iter().take(k).map(|&i| exact[i].0).collect();
         let got = top_k(&approx, k, metric);
         recall_sum += recall_at_k(&truth, &got, k);
         if !truth.is_empty() && truth.first() == got.first() {
@@ -169,6 +231,9 @@ pub fn evaluate(
         labelled_queries: labelled,
         ndcg_at_k: labelled_mean(ndcg_sum),
         doc_recall_at_k: labelled_mean(doc_recall_sum),
+        boundary_gap: median(boundary_gaps),
+        neighbour_band: median(bands),
+        rank_noise: noise_sum / nq,
     })
 }
 
@@ -238,6 +303,35 @@ mod tests {
         assert_eq!(r.vectors, 200);
         assert_eq!(r.labelled_queries, 0);
         assert_eq!(r.ndcg_at_k, None);
+        assert_eq!(r.rank_noise, 0.0);
+        assert!(r.neighbour_band >= r.boundary_gap && r.boundary_gap > 0.0);
+    }
+
+    #[test]
+    fn spacing_is_codec_independent_and_noise_is_not() {
+        let (ids, vecs) = clustered();
+        let queries = self_queries(&ids, &vecs, 20);
+        let i8 = evaluate(&ids, &vecs, &queries, &Int8Codec::new(64), Metric::Cosine, 10, None).unwrap();
+        let bin = evaluate(&ids, &vecs, &queries, &BinaryCodec::new(64), Metric::Cosine, 10, None).unwrap();
+        assert_eq!(i8.boundary_gap, bin.boundary_gap);
+        assert_eq!(i8.neighbour_band, bin.neighbour_band);
+        assert!(
+            bin.rank_noise > 10.0 * i8.rank_noise,
+            "{} vs {}",
+            bin.rank_noise,
+            i8.rank_noise
+        );
+    }
+
+    #[test]
+    fn centred_noise_ignores_a_constant_shift() {
+        let exact = vec![(1, 0.9), (2, 0.8), (3, 0.7)];
+        let shifted: Vec<(i64, f32)> = exact.iter().map(|(i, s)| (*i, s - 0.25)).collect();
+        assert!(centred_noise(&exact, &shifted, &[0, 1, 2]) < 1e-6);
+        let noisy = vec![(1, 0.8), (2, 0.9), (3, 0.7)];
+        assert!(centred_noise(&exact, &noisy, &[0, 1, 2]) > 0.05);
+        assert_eq!(median(vec![3.0, 1.0, 2.0]), 2.0);
+        assert_eq!(median(vec![4.0, 1.0, 2.0, 3.0]), 2.5);
     }
 
     #[test]
