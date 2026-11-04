@@ -116,6 +116,25 @@ pub trait Codec: Send + Sync + std::fmt::Debug {
     /// `Vector` unless the codec documents that it is a baseline.
     fn score(&self, query: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError>;
 
+    /// Transform a query once per search, before it is scored against many
+    /// stored vectors with [`Codec::score_prepared`].
+    ///
+    /// Codecs that work in a rotated or otherwise transformed space do that
+    /// work here, so the per-vector scan stays on the bytes. The default is
+    /// the identity.
+    fn prepare_query(&self, query: &[f32]) -> Result<Vector, CodecError> {
+        codecs::check_dim(self.dimension(), query.len())?;
+        Ok(query.to_vec())
+    }
+
+    /// Score a query returned by [`Codec::prepare_query`]. Must equal
+    /// `score(query, …)` for the original query. The default forwards to
+    /// [`Codec::score`], which is right whenever `prepare_query` is the
+    /// identity.
+    fn score_prepared(&self, prepared: &[f32], encoded: &Encoded, metric: Metric) -> Result<f32, CodecError> {
+        self.score(prepared, encoded, metric)
+    }
+
     /// Bytes per vector relative to uncompressed f32.
     fn compression_ratio(&self) -> f32 {
         (self.dimension() * 4) as f32 / self.encoded_size() as f32
@@ -168,8 +187,10 @@ pub trait Codec: Send + Sync + std::fmt::Debug {
 /// Names: `f32`, `int8`, `binary`, `binary-centred`, `pq<m>` (product
 /// quantization with `m` subspaces; bare `pq` means one byte per 8
 /// dimensions), `mrl<k>` (keep the first `k` dimensions, Matryoshka style)
-/// and `mrl<k>+<codec>` (truncate, then encode with another codec, for
-/// example `mrl256+int8` or `mrl128+pq16`).
+/// `mrl<k>+<codec>` (truncate, then encode with another codec, for
+/// example `mrl256+int8` or `mrl128+pq16`), and `mixed<B>[-pca][-w]`
+/// (B bytes per vector, bits allocated per dimension by variance, optionally
+/// after a PCA rotation, and with `-w` by variance × query energy).
 ///
 /// Trained codecs (see [`Codec::needs_fit`]) come back needing a [`Codec::fit`]
 /// call; use [`codec_with_params`] to restore one that was fitted earlier.
@@ -183,6 +204,18 @@ pub fn codec_by_name(name: &str, dimension: usize) -> Result<Box<dyn Codec>, Cod
             if let Some(rest) = name.strip_prefix("pq") {
                 let m = parse_param(name, rest, Some(dimension / 8))?;
                 return Ok(Box::new(codecs::PqCodec::new(dimension, m)?));
+            }
+            if let Some(rest) = name.strip_prefix("mixed") {
+                let (rest, weighted) = match rest.strip_suffix("-w") {
+                    Some(r) => (r, true),
+                    None => (rest, false),
+                };
+                let (bytes, pca) = match rest.strip_suffix("-pca") {
+                    Some(b) => (b, true),
+                    None => (rest, false),
+                };
+                let bytes = parse_param(name, bytes, Some(dimension / 8))?;
+                return Ok(Box::new(codecs::MixedCodec::new(dimension, bytes, pca, weighted)?));
             }
             if let Some(rest) = name.strip_prefix("mrl") {
                 let (keep, inner) = match rest.split_once('+') {
@@ -246,5 +279,6 @@ pub fn codec_names() -> &'static [&'static str] {
         "pq<m>",
         "mrl<k>",
         "mrl<k>+<codec>",
+        "mixed<B>[-pca][-w]",
     ]
 }

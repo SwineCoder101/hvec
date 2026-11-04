@@ -228,10 +228,11 @@ impl Store {
             ))
         })?;
 
+        let prepared = codec.prepare_query(query)?;
         let mut hits = Vec::new();
         for row in rows {
             let (chunk_id, source, ordinal, text, blob) = row?;
-            let score = codec.score(query, &Encoded(blob), metric)?;
+            let score = codec.score_prepared(&prepared, &Encoded(blob), metric)?;
             hits.push(Hit {
                 chunk_id,
                 source,

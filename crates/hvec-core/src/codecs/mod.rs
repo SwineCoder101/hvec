@@ -5,9 +5,11 @@
 //! approximate the reference distance on the original f32 vector within the
 //! codec's documented error model.
 
+mod mixed;
 mod pq;
 mod truncate;
 
+pub use mixed::MixedCodec;
 pub use pq::PqCodec;
 pub use truncate::TruncateCodec;
 
