@@ -181,6 +181,11 @@ decide how deep a hybrid re-score must go, and to decide where an adaptive code 
   cached buffer is 5.1× faster than the original row scan. Every asymmetric codec costs about
   what f32 costs per vector. `binary-hamming` is 20× cheaper, and with an f32 re-score it reaches
   95% recall@10 on FiQA about 19× faster than exact f32: the first speed claim hvec makes.
+- [ ] **Text-format experiment** (`experiments/2026-11-text-format`, scripted): the same
+  WikiBio records as prose, bullets, key-value, JSON, a table row and a key-value header over
+  prose, against lookup and descriptive queries. Finds the best format within a time budget
+  per (model, query type), and tests whether noise ÷ band predicts the re-score depth on a
+  held-out format. Adds `ingest --whole-files` (one chunk per file, layout kept).
 - [ ] Choose the codec automatically at ingest from noise ÷ band, then measure the re-score
   depth for a target recall on a sample of self-queries. The routing experiment showed that the
   curve chooses the codec well but predicts the depth badly.
