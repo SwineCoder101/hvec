@@ -1,0 +1,72 @@
+== bge-small, descriptive queries
+format        tokens f32 nDCG    band binary-hamming n/b  N@95%           pq48 n/b  N@95%
+paragraph        114   0.1735  0.0110              4.579    754              1.247     78
+bullets           75   0.1797  0.0101              4.819    825              1.253     74
+kv                74   0.1907  0.0099              4.709    722              1.205     69
+json             114   0.2238  0.0093              4.782    505              1.079     62
+table            119   0.2114  0.0095              4.679    476              1.171     68
+wiki              74   0.1131  0.0116              4.467    611              1.261     70
+header-prose     147   0.1575  0.0108              4.759    606              1.277     69
+best nDCG@10 within a time budget (exact f32 scan ≈ 4.10 ms/query, one thread)
+    10% (0.41 ms): json 0.2227 (binary-hamming 3.0σ, 0.28 ms); table 0.2128 (binary-hamming 3.0σ, 0.29 ms); kv 0.1906 (binary-hamming 3.0σ, 0.33 ms)
+    25% (1.03 ms): json 0.2227 (binary-hamming 3.0σ, 0.28 ms); table 0.2128 (binary-hamming 3.0σ, 0.29 ms); kv 0.1906 (binary-hamming 3.0σ, 0.33 ms)
+    50% (2.05 ms): json 0.2227 (binary-hamming 3.0σ, 0.28 ms); table 0.2128 (binary-hamming 3.0σ, 0.29 ms); kv 0.1906 (binary-hamming 3.0σ, 0.33 ms)
+   100% (4.10 ms): json 0.2227 (binary-hamming 3.0σ, 0.28 ms); table 0.2128 (binary-hamming 3.0σ, 0.29 ms); kv 0.1908 (pq48 N=200, 4.03 ms)
+
+== bge-small, lookup queries
+format        tokens f32 nDCG    band binary-hamming n/b  N@95%           pq48 n/b  N@95%
+paragraph        114   0.3700  0.0100              4.915    966              1.409     98
+bullets           75   0.4018  0.0097              4.985    860              1.377     85
+kv                74   0.4353  0.0095              4.947    947              1.337     78
+json             114   0.4407  0.0082              5.386    760              1.298     75
+table            119   0.4154  0.0095              4.683    712              1.228     71
+wiki              74   0.1810  0.0108              4.530    804              1.313     81
+header-prose     147   0.3702  0.0106              4.675    835              1.369     88
+best nDCG@10 within a time budget (exact f32 scan ≈ 4.10 ms/query, one thread)
+    10% (0.41 ms): json 0.4395 (binary-hamming 3.0σ, 0.30 ms); kv 0.4320 (binary-hamming N=1000, 0.41 ms); table 0.4156 (binary-hamming N=1000, 0.41 ms)
+    25% (1.03 ms): json 0.4411 (binary-hamming N=1000, 0.43 ms); kv 0.4320 (binary-hamming N=1000, 0.41 ms); table 0.4156 (binary-hamming N=1000, 0.41 ms)
+    50% (2.05 ms): json 0.4411 (binary-hamming N=1000, 0.43 ms); kv 0.4320 (binary-hamming N=1000, 0.41 ms); table 0.4156 (binary-hamming N=1000, 0.41 ms)
+   100% (4.10 ms): json 0.4411 (binary-hamming N=1000, 0.43 ms); kv 0.4353 (exact f32, 4.06 ms); table 0.4156 (binary-hamming N=1000, 0.41 ms)
+
+== minilm, descriptive queries
+format        tokens f32 nDCG    band binary-hamming n/b  N@95%           pq48 n/b  N@95%
+paragraph        114   0.1295  0.0213              2.285    246              1.005     40
+bullets           75   0.1613  0.0195              2.316    315              0.981     42
+kv                74   0.1433  0.0198              2.326    312              0.953     44
+json             114   0.1422  0.0201              2.119    291              0.873     36
+table            119   0.1808  0.0181              2.255    228              0.931     42
+wiki              74   0.0909  0.0211              2.326    270              1.047     45
+header-prose     147   0.1359  0.0212              2.309    225              1.028     44
+best nDCG@10 within a time budget (exact f32 scan ≈ 4.04 ms/query, one thread)
+    10% (0.40 ms): table 0.1811 (binary-hamming N=200, 0.25 ms); bullets 0.1604 (binary-hamming N=1000, 0.39 ms); kv 0.1421 (binary-hamming N=500, 0.30 ms)
+    25% (1.01 ms): table 0.1811 (binary-hamming N=200, 0.25 ms); bullets 0.1604 (binary-hamming N=1000, 0.39 ms); kv 0.1424 (binary-hamming N=1000, 0.40 ms)
+    50% (2.02 ms): table 0.1811 (binary-hamming N=200, 0.25 ms); bullets 0.1604 (binary-hamming N=1000, 0.39 ms); kv 0.1424 (binary-hamming N=1000, 0.40 ms)
+   100% (4.04 ms): table 0.1811 (binary-hamming N=200, 0.25 ms); bullets 0.1613 (exact f32, 3.91 ms); kv 0.1433 (pq48 N=200, 4.02 ms)
+
+== minilm, lookup queries
+format        tokens f32 nDCG    band binary-hamming n/b  N@95%           pq48 n/b  N@95%
+paragraph        114   0.1793  0.0169              2.801    367              1.169     52
+bullets           75   0.3359  0.0160              2.770    407              1.137     47
+kv                74   0.2755  0.0164              2.742    441              1.094     51
+json             114   0.2401  0.0165              2.573    317              1.033     44
+table            119   0.3533  0.0157              2.647    398              1.057     45
+wiki              74   0.0980  0.0185              2.672    365              1.179     49
+header-prose     147   0.2082  0.0185              2.606    330              1.122     46
+best nDCG@10 within a time budget (exact f32 scan ≈ 4.04 ms/query, one thread)
+    10% (0.40 ms): table 0.3536 (binary-hamming N=500, 0.30 ms); bullets 0.3372 (binary-hamming 2.0σ, 0.23 ms); kv 0.2768 (binary-hamming N=500, 0.30 ms)
+    25% (1.01 ms): table 0.3536 (binary-hamming N=500, 0.30 ms); bullets 0.3372 (binary-hamming 2.0σ, 0.23 ms); kv 0.2768 (binary-hamming N=500, 0.30 ms)
+    50% (2.02 ms): table 0.3536 (binary-hamming N=500, 0.30 ms); bullets 0.3372 (binary-hamming 2.0σ, 0.23 ms); kv 0.2768 (binary-hamming N=500, 0.30 ms)
+   100% (4.04 ms): table 0.3536 (binary-hamming N=500, 0.30 ms); bullets 0.3372 (binary-hamming 2.0σ, 0.23 ms); kv 0.2768 (binary-hamming N=500, 0.30 ms)
+
+Cross-format checks, leaving one format out at a time
+  depth for 90% recall: Spearman ρ(noise/band, depth) = 0.985, depth ≈ 3.08·k·r^1.70, held-out format within a factor of 1.14 on average (56 points)
+  depth for 95% recall: Spearman ρ(noise/band, depth) = 0.985, depth ≈ 4.74·k·r^1.83, held-out format within a factor of 1.16 on average (56 points)
+  depth for 99% recall: Spearman ρ(noise/band, depth) = 0.968, depth ≈ 10.59·k·r^1.98, held-out format within a factor of 1.24 on average (56 points)
+  hybrid nDCG at N=10: predicted from f32 nDCG and noise/band within 0.0067 on a held-out format (f32 nDCG times the mean retained share: 0.0181)
+  hybrid nDCG at N=20: predicted from f32 nDCG and noise/band within 0.0060 on a held-out format (f32 nDCG times the mean retained share: 0.0143)
+  hybrid nDCG at N=30: predicted from f32 nDCG and noise/band within 0.0047 on a held-out format (f32 nDCG times the mean retained share: 0.0117)
+  hybrid nDCG at N=50: predicted from f32 nDCG and noise/band within 0.0032 on a held-out format (f32 nDCG times the mean retained share: 0.0081)
+  hybrid nDCG at N=100: predicted from f32 nDCG and noise/band within 0.0026 on a held-out format (f32 nDCG times the mean retained share: 0.0048)
+  hybrid nDCG at N=200: predicted from f32 nDCG and noise/band within 0.0016 on a held-out format (f32 nDCG times the mean retained share: 0.0025)
+  hybrid nDCG at N=500: predicted from f32 nDCG and noise/band within 0.0008 on a held-out format (f32 nDCG times the mean retained share: 0.0010)
+  hybrid nDCG at N=1000: predicted from f32 nDCG and noise/band within 0.0005 on a held-out format (f32 nDCG times the mean retained share: 0.0006)

@@ -1,0 +1,3 @@
+hvec cb5ffd1
+Apple M4 Pro
+memory: 26 GB

@@ -1,0 +1,59 @@
+{
+  "collection": "kv-bge-small",
+  "vectors": 20000,
+  "dimension": 384,
+  "queries": 50,
+  "k": 10,
+  "repeat": 3,
+  "paths": [
+    {
+      "path": "cached buffer (Store::search)",
+      "ms_per_query": 4.209105,
+      "note": "codes scanned in place in one allocation; text read for the hits only"
+    }
+  ],
+  "loads": [
+    {
+      "source": "sqlite (borrowed blobs, one copy)",
+      "ms": 11.484708,
+      "bytes": 30720000
+    },
+    {
+      "source": "flat code file (one read)",
+      "ms": 2.699542,
+      "bytes": 30720000
+    }
+  ],
+  "codecs": [
+    {
+      "codec": "f32",
+      "bytes_per_vector": 1536,
+      "threads": 1,
+      "ms_per_query": 4.0628725,
+      "gb_per_s": 7.561152854292129,
+      "recall_at_k": 1.0
+    },
+    {
+      "codec": "binary-hamming",
+      "bytes_per_vector": 48,
+      "threads": 1,
+      "ms_per_query": 0.20218166,
+      "gb_per_s": 4.748205153721658,
+      "recall_at_k": 0.346
+    },
+    {
+      "codec": "pq48",
+      "bytes_per_vector": 48,
+      "threads": 1,
+      "ms_per_query": 3.99232584,
+      "gb_per_s": 0.24046133468905434,
+      "recall_at_k": 0.566
+    }
+  ],
+  "bandwidth": [
+    {
+      "threads": 1,
+      "gb_per_s": 89.83281590352883
+    }
+  ]
+}

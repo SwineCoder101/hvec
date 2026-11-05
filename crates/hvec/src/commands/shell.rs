@@ -294,6 +294,7 @@ impl Shell {
                 .unwrap_or_else(|| "f32".to_owned()),
             chunk_words: 200,
             overlap_words: 40,
+            whole_files: false,
             ext: ["md", "txt", "markdown", "rst"]
                 .iter()
                 .map(|s| (*s).to_owned())

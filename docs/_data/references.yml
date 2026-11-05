@@ -314,6 +314,14 @@
   year: 2024
   url: https://arxiv.org/abs/2407.02883
   note: Code retrieval datasets in BEIR's layout. The source of hvec's CoSQA copy.
+- key: lebret2016wikibio
+  topic: Embeddings and RAG
+  authors: Rémi Lebret, David Grangier, Michael Auli
+  title: Neural Text Generation from Structured Data with Application to the Biography Domain
+  venue: Conference on Empirical Methods in Natural Language Processing (EMNLP)
+  year: 2016
+  url: https://arxiv.org/abs/1603.07771
+  note: WikiBio, Wikipedia infoboxes paired with each article's opening paragraph. The source of the text-format experiment's records.
 
 - key: morris2023vec2text
   topic: Embeddings and RAG

@@ -12,7 +12,7 @@ Blog and experiment write-ups: [swinecoder101.github.io/hvec](https://swinecoder
 > connectors, seven codec families (`f32`, `int8`, `binary`, `binary-centred`, `pq<m>`, `mrl<k>`
 > and `mrl<k>+<codec>`), `bench recall` against the f32 ranking and against relevance judgments, a
 > BEIR importer, `bench run` across the matrix with a payload stage, `report`, an LLM judge and an
-> agent memory-loop benchmark. Four retrieval experiments are published. The answer-level
+> agent memory-loop benchmark. Ten retrieval experiments are published. The answer-level
 > experiments (two chat models) are scripted and waiting on API access. Expect APIs and results to
 > change without notice. Contributions and experiments are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 

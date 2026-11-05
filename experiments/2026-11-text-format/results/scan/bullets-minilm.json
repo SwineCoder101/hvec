@@ -1,0 +1,59 @@
+{
+  "collection": "bullets-minilm",
+  "vectors": 20000,
+  "dimension": 384,
+  "queries": 50,
+  "k": 10,
+  "repeat": 3,
+  "paths": [
+    {
+      "path": "cached buffer (Store::search)",
+      "ms_per_query": 4.06417916,
+      "note": "codes scanned in place in one allocation; text read for the hits only"
+    }
+  ],
+  "loads": [
+    {
+      "source": "sqlite (borrowed blobs, one copy)",
+      "ms": 11.145583,
+      "bytes": 30720000
+    },
+    {
+      "source": "flat code file (one read)",
+      "ms": 3.060833,
+      "bytes": 30720000
+    }
+  ],
+  "codecs": [
+    {
+      "codec": "f32",
+      "bytes_per_vector": 1536,
+      "threads": 1,
+      "ms_per_query": 3.9051850000000004,
+      "gb_per_s": 7.866464712939335,
+      "recall_at_k": 1.0
+    },
+    {
+      "codec": "binary-hamming",
+      "bytes_per_vector": 48,
+      "threads": 1,
+      "ms_per_query": 0.19941915999999998,
+      "gb_per_s": 4.813980762931706,
+      "recall_at_k": 0.414
+    },
+    {
+      "codec": "pq48",
+      "bytes_per_vector": 48,
+      "threads": 1,
+      "ms_per_query": 3.91618418,
+      "gb_per_s": 0.24513658088471213,
+      "recall_at_k": 0.634
+    }
+  ],
+  "bandwidth": [
+    {
+      "threads": 1,
+      "gb_per_s": 89.16270076811293
+    }
+  ]
+}

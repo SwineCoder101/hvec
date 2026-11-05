@@ -416,6 +416,10 @@ pub struct IngestArgs {
     /// Overlapping words between consecutive chunks.
     #[arg(long, default_value_t = 40)]
     pub overlap_words: usize,
+    /// Store each file as one chunk, verbatim (line breaks kept), instead of word windows.
+    /// For corpora of one record per file, where the layout is under test.
+    #[arg(long, conflicts_with_all = ["chunk_words", "overlap_words"])]
+    pub whole_files: bool,
     /// File extensions to include when walking directories.
     #[arg(long, value_delimiter = ',', default_value = "md,txt,markdown,rst")]
     pub ext: Vec<String>,
