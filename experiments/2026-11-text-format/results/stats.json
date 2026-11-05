@@ -1,0 +1,57 @@
+{
+  "records": 20000,
+  "lookup_queries": 500,
+  "descriptive_queries": 500,
+  "seed": 2026,
+  "formats": {
+    "paragraph": {
+      "mean_bytes": 503.7568,
+      "mean_words": 79.5741,
+      "mean_tokens": 114.0377,
+      "p99_tokens": 231,
+      "over_400_tokens": 1
+    },
+    "bullets": {
+      "mean_bytes": 334.27645,
+      "mean_words": 60.1161,
+      "mean_tokens": 74.5787,
+      "p99_tokens": 155,
+      "over_400_tokens": 0
+    },
+    "kv": {
+      "mean_bytes": 322.8965,
+      "mean_words": 49.73615,
+      "mean_tokens": 73.5787,
+      "p99_tokens": 154,
+      "over_400_tokens": 0
+    },
+    "json": {
+      "mean_bytes": 366.6407,
+      "mean_words": 46.3079,
+      "mean_tokens": 113.895,
+      "p99_tokens": 216,
+      "over_400_tokens": 0
+    },
+    "table": {
+      "mean_bytes": 392.1762,
+      "mean_words": 73.49555,
+      "mean_tokens": 119.0985,
+      "p99_tokens": 221,
+      "over_400_tokens": 0
+    },
+    "wiki": {
+      "mean_bytes": 376.23385,
+      "mean_words": 71.19245,
+      "mean_tokens": 73.91285,
+      "p99_tokens": 158,
+      "over_400_tokens": 0
+    },
+    "header-prose": {
+      "mean_bytes": 701.13035,
+      "mean_words": 120.9286,
+      "mean_tokens": 147.49155,
+      "p99_tokens": 283,
+      "over_400_tokens": 0
+    }
+  }
+}

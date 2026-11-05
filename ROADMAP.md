@@ -181,11 +181,17 @@ decide how deep a hybrid re-score must go, and to decide where an adaptive code 
   cached buffer is 5.1× faster than the original row scan. Every asymmetric codec costs about
   what f32 costs per vector. `binary-hamming` is 20× cheaper, and with an f32 re-score it reaches
   95% recall@10 on FiQA about 19× faster than exact f32: the first speed claim hvec makes.
-- [ ] **Text-format experiment** (`experiments/2026-11-text-format`, scripted): the same
-  WikiBio records as prose, bullets, key-value, JSON, a table row and a key-value header over
-  prose, against lookup and descriptive queries. Finds the best format within a time budget
-  per (model, query type), and tests whether noise ÷ band predicts the re-score depth on a
-  held-out format. Adds `ingest --whole-files` (one chunk per file, layout kept).
+- [x] **Text-format experiment** (`experiments/2026-11-text-format`), with `ingest --whole-files`
+  (one chunk per file, layout kept). The same WikiBio records as prose, bullets, key-value, JSON
+  and a table row: format moves f32 nDCG@10 by up to 2×, and templated prose is last in every
+  context. The best format depends on the model (JSON on bge-small, a table row on MiniLM), not
+  the query type. There is no accuracy-for-speed trade-off: a `binary-hamming` scan plus 100
+  f32 re-scores keeps 0.96–0.99 of the best format's nDCG at 1/19 of the time. Noise ÷ band
+  predicts the depth on a held-out format within a factor of 1.16.
+- [ ] Embed one format and return another (match on key-value, hand the model prose): a payload
+  text per chunk, separate from the text embedded.
+- [ ] Per-query scores from `bench recall`, so format and codec comparisons carry confidence
+  intervals.
 - [ ] Choose the codec automatically at ingest from noise ÷ band, then measure the re-score
   depth for a target recall on a sample of self-queries. The routing experiment showed that the
   curve chooses the codec well but predicts the depth badly.
