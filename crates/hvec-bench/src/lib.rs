@@ -14,7 +14,7 @@ pub mod record;
 pub mod report;
 pub mod rescore;
 
-pub use chunk::{ChunkOptions, chunk_text};
+pub use chunk::{ChunkOptions, chunk_text, chunk_whole};
 pub use judge::{JUDGE_PROMPT_VERSION, JUDGE_SYSTEM_PROMPT, Verdict, build_judge_prompt, parse_verdict};
 pub use payload::{Payload, PayloadStats};
 pub use prompt::{RAG_SYSTEM_PROMPT, build_user_prompt};

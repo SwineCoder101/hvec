@@ -1247,3 +1247,45 @@ fn bench_scan_times_paths_and_codecs_and_keeps_f32_exact() {
     assert!(codecs.iter().all(|c| c["ms_per_query"].as_f64().unwrap() >= 0.0));
     assert_eq!(r["bandwidth"].as_array().unwrap().len(), 2);
 }
+
+#[test]
+fn whole_files_stores_one_chunk_per_file() {
+    let env = Env::new();
+    // 450 words: three overlapping word windows by default, one chunk with --whole-files.
+    let long = (0..150)
+        .map(|i| format!("- field{i}: value{i}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let path = env.write_doc("record.md", &long);
+    let path = path.to_str().unwrap();
+
+    let out = env.run(&["ingest", path, "--collection", "windows"]);
+    assert_ok(&out, "ingest windows");
+    assert!(
+        stdout(&out).contains("ingested 3 chunks from 1 files"),
+        "{}",
+        stdout(&out)
+    );
+
+    let out = env.run(&["ingest", path, "--collection", "whole", "--whole-files"]);
+    assert_ok(&out, "ingest whole");
+    assert!(
+        stdout(&out).contains("ingested 1 chunks from 1 files"),
+        "{}",
+        stdout(&out)
+    );
+
+    let out = env.run(&[
+        "ingest",
+        path,
+        "--collection",
+        "both",
+        "--whole-files",
+        "--chunk-words",
+        "50",
+    ]);
+    assert!(
+        !out.status.success(),
+        "--whole-files with --chunk-words should be refused"
+    );
+}

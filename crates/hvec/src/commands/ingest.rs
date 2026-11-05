@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{Context as _, Result, bail};
-use hvec_bench::{ChunkOptions, chunk_text};
+use hvec_bench::{ChunkOptions, chunk_text, chunk_whole};
 use hvec_connect::Embedder;
 use hvec_core::{Metric, codec_by_name};
 use hvec_store::{NewChunk, NewCollection};
@@ -72,10 +72,10 @@ pub async fn run(config: &Option<PathBuf>, args: IngestArgs) -> Result<()> {
         codec = existing.codec()?;
     }
 
-    let opts = ChunkOptions {
+    let opts = (!args.whole_files).then_some(ChunkOptions {
         words: args.chunk_words,
         overlap: args.overlap_words,
-    };
+    });
     let batch = args.batch.max(1);
     let started = Instant::now();
     let mut total_chunks = 0usize;
@@ -189,11 +189,15 @@ pub async fn run(config: &Option<PathBuf>, args: IngestArgs) -> Result<()> {
     Ok(())
 }
 
-async fn read_chunks(file: &Path, opts: ChunkOptions) -> Result<Vec<String>> {
+/// Word windows under `opts`, or the whole file as one chunk when `opts` is `None`.
+async fn read_chunks(file: &Path, opts: Option<ChunkOptions>) -> Result<Vec<String>> {
     let text = tokio::fs::read_to_string(file)
         .await
         .with_context(|| format!("reading {}", file.display()))?;
-    Ok(chunk_text(&text, opts))
+    Ok(match opts {
+        Some(opts) => chunk_text(&text, opts),
+        None => chunk_whole(&text),
+    })
 }
 
 async fn embed_all(embedder: &dyn Embedder, pieces: &[String], batch: usize) -> Result<Vec<Vec<f32>>> {

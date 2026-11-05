@@ -42,6 +42,17 @@ pub fn chunk_text(text: &str, opts: ChunkOptions) -> Vec<String> {
     out
 }
 
+/// The whole of `text` as one chunk, line breaks and spacing kept; only the
+/// leading and trailing whitespace is trimmed. Empty input yields no chunks.
+///
+/// For corpora whose files are already one record each, where the layout is
+/// the thing under test: `chunk_text` would join every line with single spaces.
+#[must_use]
+pub fn chunk_whole(text: &str) -> Vec<String> {
+    let t = text.trim();
+    if t.is_empty() { Vec::new() } else { vec![t.to_owned()] }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -68,5 +79,12 @@ mod tests {
     fn overlap_at_least_size_still_terminates() {
         let chunks = chunk_text("a b c d e", ChunkOptions { words: 2, overlap: 5 });
         assert_eq!(chunks, vec!["a b", "b c", "c d", "d e"]);
+    }
+
+    #[test]
+    fn whole_keeps_layout_and_trims_the_ends() {
+        let text = "\n- name: ada\n- born:  1815\n\n";
+        assert_eq!(chunk_whole(text), vec!["- name: ada\n- born:  1815"]);
+        assert!(chunk_whole(" \n\t").is_empty());
     }
 }
